@@ -1,0 +1,39 @@
+{
+  "name": "gym-tracker",
+  "version": "1.0.0",
+  "description": "Personal gym log: see what you did last time, log a set in one tap, leave yourself a plan.",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,magenta \"tsx watch server/index.ts\" \"vite\"",
+    "build": "vite build",
+    "start": "vite build && tsx server/index.ts",
+    "typecheck": "tsc -p .",
+    "import": "tsx server/import.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BohdanMoroz11/gym-tracker.git"
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@fontsource-variable/big-shoulders-display": "^5.3.0",
+    "@fontsource/barlow": "^5.3.0",
+    "@tanstack/react-query": "^5.105.0",
+    "express": "^4.22.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/express": "^4.17.25",
+    "@types/node": "^26.6.6",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}

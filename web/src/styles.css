@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* "Plates on rubber": rubber-floor charcoal, chalk text, competition plate colors as the only accents.
+   Blue = back day, red = chest day, yellow = legs, green = go up. Numbers are the loud thing. */
+@theme {
+  --color-floor: #1c1f22; /* page */
+  --color-mat: #25292d; /* raised surfaces */
+  --color-bench: #2f3439; /* nested / pressed */
+  --color-rule: #3a4046; /* hairlines */
+  --color-chalk: #ece8df; /* primary text */
+  --color-mute: #a0a5ab; /* secondary text */
+  --color-faint: #6f757c;
+  --color-blue: #4a86e8; /* back day */
+  --color-red: #e5534b; /* chest day */
+  --color-yellow: #d9a514; /* legs day */
+  --color-green: #3fae6a; /* go up / done */
+  --color-amber: #e39b3a; /* go down / careful */
+
+  --font-display: "Big Shoulders Display Variable", "Arial Narrow", sans-serif;
+  --font-sans: "Barlow", system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--color-floor);
+  color: var(--color-chalk);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* Numbers: stencil-ish, tabular so columns of sets line up */
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-chalk);
+  outline-offset: 2px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* The one confirmation moment: a logged set settles in. */
+@keyframes settle {
+  from {
+    transform: scale(1.06);
+    background: color-mix(in oklab, var(--color-green) 30%, transparent);
+  }
+}
+.settle {
+  animation: settle 0.45s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settle {
+    animation: none;
+  }
+}
+
+.safe-b {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-t {
+  padding-top: env(safe-area-inset-top);
+}
