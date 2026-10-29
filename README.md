@@ -11,6 +11,7 @@ A personal gym log that replaces a messy phone note. It remembers what you did l
 
 **During a session**
 - Each exercise shows last time's sets and the note you left yourself.
+- A note that stays with the exercise (seat position, "keep elbows down") sits on top of the card every session, even when it's collapsed. Edit it right there.
 - Weight is prefilled; tap the number of reps you did and the set is logged. Rest timer starts on its own.
 - Weight steppers fit the equipment: machines move a plate at a time, free weights by 0.5 kg with ±2.5/±5 jumps, or tap the number and type it.
 - Change a set's rep aim mid-session if the program needs correcting.

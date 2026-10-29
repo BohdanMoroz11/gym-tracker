@@ -114,6 +114,7 @@ function ExerciseCard(props: {
             {pr && <span className="rounded-md bg-green/15 px-1.5 py-px text-xs font-semibold text-green">Best ever</span>}
             <span>{entry.sets.length ? <span className="text-chalk">{fmtSets(entry.sets)}</span> : !props.live ? "Skipped" : plan.length ? <>Today {fmtTargets(plan)}</> : "No sets yet"}</span>
           </div>
+          {ex.note && !open && <p className="mt-1.5 line-clamp-2 border-l-2 border-chalk/60 pl-2 text-sm whitespace-pre-line text-chalk">{ex.note}</p>}
         </div>
         <span className={cx("mt-1 text-xl text-faint transition-transform", open && "rotate-180")} aria-hidden>
           ⌄
@@ -122,6 +123,7 @@ function ExerciseCard(props: {
 
       {open && (
         <div className="space-y-4 px-3 pb-4 sm:px-4">
+          <StandingNote ex={ex} />
           <LastTime prev={prev} ex={ex} />
           <Sets {...props} plan={plan} />
           {entry.sets.length > 0 && <NextTime ex={ex} entry={entry} onChange={onChange} />}
@@ -174,6 +176,53 @@ function Progress({ done, planned }: { done: number; planned: number }) {
   );
 }
 
+/** A note that belongs to the exercise, not the session: seat position, form cues. Shown every time. */
+function StandingNote({ ex }: { ex: Exercise }) {
+  const save = useSaveExercise();
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(ex.note ?? "");
+  useEffect(() => setText(ex.note ?? ""), [ex.note]);
+  const commit = () => {
+    const note = text.trim() || undefined;
+    if (note !== ex.note) void save({ ...ex, note });
+    setEditing(false);
+  };
+
+  if (editing)
+    return (
+      <div className="space-y-2 rounded-xl border-l-4 border-chalk bg-floor/60 p-3">
+        <div className="text-sm text-mute">Shown every time you do {ex.name.toLowerCase()}</div>
+        <textarea autoFocus rows={3} className={cx(input, "h-auto py-3")} placeholder="Seat on 4, keep elbows down…" value={text} onChange={(e) => setText(e.target.value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => {
+              setText(ex.note ?? "");
+              setEditing(false);
+            }}
+            className={cx(pill, "h-12")}
+          >
+            Cancel
+          </button>
+          <button onClick={commit} className="h-12 rounded-xl bg-chalk font-semibold text-floor">
+            Save note
+          </button>
+        </div>
+      </div>
+    );
+  if (!ex.note)
+    return (
+      <button onClick={() => setEditing(true)} className="flex h-12 w-full items-center gap-2 rounded-xl border-2 border-dashed border-rule px-3.5 text-left text-mute active:bg-bench">
+        <span className="text-lg text-chalk">+</span> Note that stays (seat position, form cue)
+      </button>
+    );
+  return (
+    <button onClick={() => setEditing(true)} className="flex w-full items-start gap-3 rounded-xl border-l-4 border-chalk bg-floor/60 px-3.5 py-3 text-left active:bg-bench" aria-label={`Exercise note: ${ex.note}. Tap to edit.`}>
+      <span className="min-w-0 flex-1 text-[17px] leading-snug whitespace-pre-line text-chalk">{ex.note}</span>
+      <span className="shrink-0 pt-0.5 text-sm text-faint">Edit</span>
+    </button>
+  );
+}
+
 function LastTime({ prev, ex }: { prev?: { session: Session; entry: Entry }; ex: Exercise }) {
   if (!prev)
     return (
@@ -186,7 +235,6 @@ function LastTime({ prev, ex }: { prev?: { session: Session; entry: Entry }; ex:
       <div className="text-sm text-mute">Last time, {prev.session.approx ? "from old notes" : agoLabel(prev.session.date)}</div>
       <div className="num mt-0.5 text-xl leading-snug">{fmtSets(prev.entry.sets)}</div>
       {prev.entry.note && <p className="mt-1 text-chalk">“{prev.entry.note}”</p>}
-      {ex.note && <p className="mt-1 text-sm text-mute">{ex.note}</p>}
       {prev.session.approx && <p className="mt-1 text-sm text-faint">Old notes can be off. Fix the weight if it looks wrong.</p>}
     </div>
   );

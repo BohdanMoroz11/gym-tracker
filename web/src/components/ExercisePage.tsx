@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DayId, DB, Exercise, Group, Kind } from "../../../shared/types.ts";
 import { DAYS, fmtDate, fmtSets, fmtTargets, fmtW, GROUP_LABEL, history, KIND_LABEL, nextOf, series, type Point } from "../../../shared/logic.ts";
-import { dayColor, go, useSaveExercise } from "../lib.ts";
+import { cx, dayColor, go, useSaveExercise } from "../lib.ts";
 import { Field, input, pill } from "./ui.tsx";
 
 export function ExercisePage({ db, id }: { db: DB; id: string }) {
@@ -21,6 +21,7 @@ export function ExercisePage({ db, id }: { db: DB; id: string }) {
           <p className="text-mute">{KIND_LABEL[ex.kind]}</p>
         </div>
       </div>
+      {ex.note && <p className="mt-4 rounded-xl border-l-4 border-chalk bg-mat px-3.5 py-3 text-[17px] whitespace-pre-line">{ex.note}</p>}
       {h[0] && (
         <p className="mt-4 text-mute">
           Next time <span className="num text-xl text-chalk">{fmtTargets(nextOf(h[0].entry, ex))}</span>
@@ -113,8 +114,8 @@ function Settings({ ex }: { ex: Exercise }) {
           </select>
         </Field>
       </div>
-      <Field label="Always-on note (seat position, grip…)">
-        <input className={input} value={e.note ?? ""} placeholder="Shows every time you open it" onChange={(x) => set({ note: x.target.value || undefined })} />
+      <Field label="Note that stays (seat position, form cue)">
+        <textarea rows={3} className={cx(input, "h-auto py-3")} value={e.note ?? ""} placeholder="Shown on the exercise every session" onChange={(x) => set({ note: x.target.value || undefined })} />
       </Field>
       <p className="text-sm text-faint">The go-up step is what “Up on set 2” and “All up” add. Free weights always move 0.5 kg on the − + buttons; machines move by the step.</p>
       <button onClick={() => set({ archived: !e.archived })} className="text-sm text-mute hover:text-chalk">

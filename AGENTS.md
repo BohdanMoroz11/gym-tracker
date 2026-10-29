@@ -60,7 +60,8 @@ Direction: **"plates on rubber"**. Rubber-floor charcoal (`floor`, `mat`, `bench
 - **One tap per set.** The set input is a weight stepper (prefilled from the plan) plus a strip of rep numbers. Tapping the number logs the set. Target-range chips are outlined. Don't add confirm steps.
 - **Weights always carry the unit**: "15kg × 10" (`fmtSets`, `<Kg>`).
 - **Every tappable thing looks tappable**: filled `pill` buttons (44px+), dashed outlines for "add" actions, no bare text links. Rep chips and the weight stepper are 56px. Keep rings `ring-inset` and give scrollers vertical padding so outlines aren't clipped. On phones, use stacked/equal-width grids instead of squeezing a title and buttons into one row.
-- **Note for next time** is available as soon as one set is logged.
+- **Note for next time** (`entry.note`, one session → the next) is available as soon as one set is logged.
+- **Note that stays** (`exercise.note`: seat position, form cues) is edited right on the session card and shown prominently: chalk left bar at the top of the open card, a two-line preview on the collapsed card, and on the exercise page. Keep it visible; the owner asked for that.
 - **Nothing is required.** Notes, finishing all sets, finishing the session: all optional. Unlogged exercises just carry over.
 - **The app makes the decision, the owner can override it.** "Next time" is pre-filled with the suggestion; the owner only taps when they disagree.
 - **Never lose a set.** Saves go to localStorage first, then the server, retried until they stick. The session bar shows saved / saving / "saved on phone, will sync".
