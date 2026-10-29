@@ -52,8 +52,8 @@ export function TodayPage({ db }: { db: DB }) {
           session={live}
           open={finishing}
           onClose={() => setFinishing(false)}
-          onFinish={(note) => {
-            save({ ...live, note, end: new Date().toISOString() });
+          onFinish={(fin) => {
+            save({ ...live, ...fin });
             setFinishing(false);
           }}
           onDiscard={() => {
@@ -98,7 +98,7 @@ function Start({ db, onStart }: { db: DB; onStart: (s: Session) => void }) {
               const ts = applyMode(targetsFor(db, ex), mode, ex);
               return (
                 <li key={ex.id} className="flex items-baseline justify-between gap-4 py-3">
-                  <span className="font-medium">{ex.short}</span>
+                  <span className="font-medium">{ex.name}</span>
                   <span className="num text-right text-lg text-mute">{ts.length ? fmtTargets(ts) : "new"}</span>
                 </li>
               );
@@ -134,7 +134,7 @@ function Start({ db, onStart }: { db: DB; onStart: (s: Session) => void }) {
           {(["back", "chest", "legs", null] as const)
             .filter((d) => d !== day)
             .map((d) => (
-              <button key={d ?? "free"} onClick={() => setDay(d)} className="flex items-center gap-2 rounded-xl bg-mat px-3 py-2 text-sm font-medium hover:bg-bench">
+              <button key={d ?? "free"} onClick={() => setDay(d)} className="flex h-11 items-center gap-2 rounded-xl bg-mat px-4 font-medium active:bg-bench hover:bg-bench">
                 <span className="h-3 w-3 rounded-full" style={{ background: dayColor(d) }} />
                 {d ? DAYS[d].label : "Empty session"}
               </button>
@@ -158,7 +158,7 @@ function Start({ db, onStart }: { db: DB; onStart: (s: Session) => void }) {
                   .filter((e) => e.sets.length)
                   .map((e) => (
                     <p key={e.ex} className={cx("truncate")}>
-                      <span className="text-mute">{m.get(e.ex)?.short}</span> {fmtSets(e.sets)}
+                      <span className="text-mute">{m.get(e.ex)?.name}</span> {fmtSets(e.sets)}
                       {e.note && <span className="text-faint"> ({e.note})</span>}
                     </p>
                   ))}

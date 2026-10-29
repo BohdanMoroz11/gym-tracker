@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { DayId, DB, Exercise, Group, Kind } from "../../../shared/types.ts";
-import { DAYS, fmtDate, fmtSets, fmtTargets, fmtW, GROUP_LABEL, history, nextOf, series, type Point } from "../../../shared/logic.ts";
+import { DAYS, fmtDate, fmtSets, fmtTargets, fmtW, GROUP_LABEL, history, KIND_LABEL, nextOf, series, type Point } from "../../../shared/logic.ts";
 import { dayColor, go, useSaveExercise } from "../lib.ts";
-import { Field, input } from "./ui.tsx";
+import { Field, input, pill } from "./ui.tsx";
 
 export function ExercisePage({ db, id }: { db: DB; id: string }) {
   const ex = db.exercises.find((e) => e.id === id);
@@ -11,14 +11,14 @@ export function ExercisePage({ db, id }: { db: DB; id: string }) {
   const p = series(db, id);
   return (
     <div className="pt-4 pb-10">
-      <button onClick={() => history_back()} className="text-sm text-mute hover:text-chalk">
+      <button onClick={() => history_back()} className={pill}>
         ‹ Back
       </button>
       <div className="mt-2 flex items-center gap-3">
         <span className="h-10 w-2 rounded-full" style={{ background: dayColor(ex.day) }} />
         <div>
-          <h1 className="num text-4xl uppercase leading-none">{ex.short}</h1>
-          <p className="text-mute">{ex.name}</p>
+          <h1 className="num text-4xl leading-none uppercase">{ex.name}</h1>
+          <p className="text-mute">{KIND_LABEL[ex.kind]}</p>
         </div>
       </div>
       {h[0] && (
@@ -71,13 +71,12 @@ function Settings({ ex }: { ex: Exercise }) {
     <section className="space-y-3 self-start rounded-2xl bg-mat p-4">
       <h2 className="font-semibold">Setup</h2>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Your name for it">
-          <input className={input} value={e.short} onChange={(x) => set({ short: x.target.value })} />
-        </Field>
-        <Field label="Full name">
-          <input className={input} value={e.name} onChange={(x) => set({ name: x.target.value })} />
-        </Field>
-        <Field label="Weight step, kg">
+        <div className="col-span-2">
+          <Field label="Name">
+            <input className={input} value={e.name} onChange={(x) => set({ name: x.target.value })} />
+          </Field>
+        </div>
+        <Field label="Go-up step, kg">
           <input className={input} inputMode="decimal" value={e.inc} onChange={(x) => set({ inc: num(x.target.value) })} />
         </Field>
         <Field label="Usual reps">
@@ -117,7 +116,7 @@ function Settings({ ex }: { ex: Exercise }) {
       <Field label="Always-on note (seat position, grip…)">
         <input className={input} value={e.note ?? ""} placeholder="Shows every time you open it" onChange={(x) => set({ note: x.target.value || undefined })} />
       </Field>
-      <p className="text-sm text-faint">The weight step drives “go up”. Suggestions aim for the top of the usual reps, then add one step.</p>
+      <p className="text-sm text-faint">The go-up step is what “Up on set 2” and “All up” add. Free weights always move 0.5 kg on the − + buttons; machines move by the step.</p>
       <button onClick={() => set({ archived: !e.archived })} className="text-sm text-mute hover:text-chalk">
         {e.archived ? "Bring back to the exercise list" : "Hide from the exercise list"}
       </button>
@@ -162,7 +161,7 @@ function Chart({ points }: { points: Point[] }) {
       <div className="mb-2 flex items-baseline gap-2 text-sm">
         <span className="text-mute">{sel.approx ? "old notes" : fmtDate(sel.date)}</span>
         <span className="num text-xl">
-          {fmtW(sel.top.w)} × {sel.top.r}
+          {fmtW(sel.top.w)}kg × {sel.top.r}
         </span>
         {sel.mode !== "normal" && <span className="text-mute">{sel.mode === "deload" ? "deload" : "lighter"}</span>}
       </div>

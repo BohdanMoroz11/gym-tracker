@@ -43,10 +43,12 @@ web/src/
 
 ## Domain model
 
-- **Session**: `day` (back / chest / legs / null = free), `mode` (normal / comeback = ~15% lighter / deload = ~40% lighter), `entries` in the order done, `end` missing = in progress. Only one session is open at a time. One left open more than 4 h after its last set closes itself.
+- **Session**: `day` (back / chest / legs / null = free), `mode` (normal / comeback = ~15% lighter / deload = ~40% lighter), `entries` in the order done, `end` missing = in progress, `feel` = body and head ratings 1–5 asked at finish. Only one session is open at a time. The finish sheet lets you pick the end time ("Now", "After last set" = last set + 5 min, ±5 min); it defaults to after the last set if that was 15+ min ago. One left open more than 4 h after its last set closes itself.
+- **Exercise**: proper names only (no cryptic shorthand; the owner's shorthand is only for importing). `kind` splits machines/cables from free weights (dumbbell, barbell, bodyweight), and lists are grouped that way. `inc` is the go-up step; the − + stepper moves free weights by 0.5 kg (`stepOf`), with ±2.5/±5 jump buttons, and the number can be tapped to type. `oneoff` exercises are typed in for one session and hidden from lists and stats.
 - **Entry**: one exercise in a session. `plan` = targets snapshotted at start, `sets` = what was done, `next` = targets for next time (absent = computed with `suggestNext`), `note` = free text for next time. Entries with no sets are "planned but skipped". They stay in the day's order for next time.
 - **Target**: `{ w, lo, hi }`, weight plus rep range, per set. This replaces the free-text notes: "12 on the second, 12-15" becomes set 2 = 12 × 12–15.
-- **Progression** (`suggestNext`): per set, at or over the top of the range → +1 weight step; more than 2 reps under the bottom → −1 step; else stay. Default range comes from the exercise; a lighter set after the first is a back-off set and defaults to 12–15 (`rangeFor`). The owner can override with Same / All up / per-set edits; that override is stored in `next`.
+- **Next time** defaults to **the same** weights and aims (`sameNext`), owner's call. One-tap presets (`nextPresets`): Same, Up on set N (bump the last/back-off set first, which is how the owner progresses), All up. Per-set weight and aim edits are possible; anything not equal to Same is stored in `next`. `suggestNext` (double progression) only drives the green "hit the top of the range on set N" hint. A lighter set after the first is a back-off set and defaults to 12–15 (`rangeFor`).
+- **Aim mid-session**: each set's aim can be changed while logging ("Aim 8–10 · Change"). It rewrites that set in `plan`, and next time follows it.
 - **Targets for today** (`targetsFor`): the `next` of the latest non-deload entry for that exercise. Deload sessions never move targets.
 - **Day plan** (`dayPlan`): exercise order of the last session of that day, else library exercises tagged with that day.
 - **Imported old notes** (`approx: true`): unreliable (forgotten logs, wrong numbers, inconsistent format, guessed dates). They seed targets and show in history, but are excluded from records, trends, tips, streaks, the calendar and muscle balance (`logged()` in logic.ts). Each one has a "these numbers are right" button that clears the flag.
@@ -56,6 +58,9 @@ web/src/
 Direction: **"plates on rubber"**. Rubber-floor charcoal (`floor`, `mat`, `bench`, `rule`), chalk text, **competition plate colors as the only accents, each with a meaning**: blue = back day, red = chest day, yellow = legs day, green = go up / done, amber = go down / short. Numbers are the loud element: Big Shoulders Display (`.num`, tabular) for weights, reps and headings; Barlow for UI text. Fonts are self-hosted via @fontsource so they work through the tunnel.
 
 - **One tap per set.** The set input is a weight stepper (prefilled from the plan) plus a strip of rep numbers. Tapping the number logs the set. Target-range chips are outlined. Don't add confirm steps.
+- **Weights always carry the unit**: "15kg × 10" (`fmtSets`, `<Kg>`).
+- **Every tappable thing looks tappable**: filled `pill` buttons (44px+), dashed outlines for "add" actions, no bare text links. Rep chips and the weight stepper are 56px. Keep rings `ring-inset` and give scrollers vertical padding so outlines aren't clipped. On phones, use stacked/equal-width grids instead of squeezing a title and buttons into one row.
+- **Note for next time** is available as soon as one set is logged.
 - **Nothing is required.** Notes, finishing all sets, finishing the session: all optional. Unlogged exercises just carry over.
 - **The app makes the decision, the owner can override it.** "Next time" is pre-filled with the suggestion; the owner only taps when they disagree.
 - **Never lose a set.** Saves go to localStorage first, then the server, retried until they stick. The session bar shows saved / saving / "saved on phone, will sync".

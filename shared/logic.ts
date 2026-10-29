@@ -30,13 +30,13 @@ const DAY_MS = 86_400_000;
 export const fmtW = (w: number) => (Number.isInteger(w) ? String(w) : w.toFixed(2).replace(/0+$/, ""));
 const fmtRange = (lo: number, hi: number) => (lo === hi ? String(hi) : `${lo}–${hi}`);
 
-/** Same shorthand as the old notes: "15×10, 12.5×13", "48×10×2". */
+/** "15kg × 10, 12.5kg × 13"; identical sets collapse to "48kg × 10 (2 sets)". */
 export function fmtSets(sets: SetLog[]): string {
   const out: string[] = [];
   for (let i = 0; i < sets.length; ) {
     let n = 1;
     while (i + n < sets.length && sets[i + n].w === sets[i].w && sets[i + n].r === sets[i].r) n++;
-    out.push(`${fmtW(sets[i].w)}×${sets[i].r}${n > 1 ? `×${n}` : ""}`);
+    out.push(`${fmtW(sets[i].w)}kg × ${sets[i].r}${n > 1 ? ` (${n} sets)` : ""}`);
     i += n;
   }
   return out.join(", ");
@@ -48,11 +48,16 @@ export function fmtTargets(ts: Target[]): string {
     let n = 1;
     const a = ts[i];
     while (i + n < ts.length && ts[i + n].w === a.w && ts[i + n].lo === a.lo && ts[i + n].hi === a.hi) n++;
-    out.push(`${fmtW(a.w)}×${fmtRange(a.lo, a.hi)}${n > 1 ? ` ×${n}` : ""}`);
+    out.push(`${fmtW(a.w)}kg × ${fmtRange(a.lo, a.hi)}${n > 1 ? ` (${n} sets)` : ""}`);
     i += n;
   }
   return out.join(", ");
 }
+
+export const isFree = (ex: Exercise) => ex.kind === "dumbbell" || ex.kind === "barbell" || ex.kind === "bodyweight";
+/** Stepper granularity: machines move by their stack step, free weights by 0.5 (big jumps are typed or use the jump buttons). */
+export const stepOf = (ex: Exercise) => (isFree(ex) ? 0.5 : ex.inc || 1);
+export const KIND_LABEL: Record<Exercise["kind"], string> = { machine: "Machine", cable: "Cable", dumbbell: "Dumbbells", barbell: "Barbell", bodyweight: "Bodyweight" };
 
 export const fmtRangeT = (t: Target) => fmtRange(t.lo, t.hi);
 
@@ -128,7 +133,26 @@ export function suggestNext(entry: Entry, ex: Exercise): Target[] {
   });
 }
 
-export const nextOf = (entry: Entry, ex: Exercise) => entry.next ?? suggestNext(entry, ex);
+/** Default for next time: the same weights, same aims. The owner bumps it when they want to. */
+export function sameNext(entry: Entry, ex: Exercise): Target[] {
+  return entry.sets.map((s, i) => {
+    const p = entry.plan?.[i];
+    const [lo, hi] = p ? [p.lo, p.hi] : rangeFor(ex, entry.sets.map((x) => x.w), i);
+    return { w: s.w, lo, hi };
+  });
+}
+
+/** One-tap choices for next time. "Up on the last set" first: the owner bumps the back-off set before the top set. */
+export function nextPresets(entry: Entry, ex: Exercise) {
+  const same = sameNext(entry, ex);
+  const bump = (t: Target) => ({ ...t, w: +(t.w + ex.inc).toFixed(2) });
+  const out: { key: string; label: string; ts: Target[] }[] = [{ key: "same", label: "Same", ts: same }];
+  if (same.length >= 2) out.push({ key: "last", label: `Up on set ${same.length}`, ts: same.map((t, i) => (i === same.length - 1 ? bump(t) : t)) });
+  out.push({ key: "all", label: "All up", ts: same.map(bump) });
+  return out;
+}
+
+export const nextOf = (entry: Entry, ex: Exercise) => entry.next ?? sameNext(entry, ex);
 
 /** What the last real (non-deload) time told us to do now. */
 export function targetsFor(db: DB, ex: Exercise, skipSession?: string): Target[] {
@@ -293,14 +317,14 @@ export function tips(db: DB): Tip[] {
     if (!p.length || daysBetween(p[p.length - 1].date) > 45) continue;
     const stuck = stalledFor(p);
     if (stuck >= 4) {
-      out.push({ id: `stall-${ex.id}`, tone: "nudge", ex: ex.id, text: `${ex.short} hasn't beaten its best in ${stuck} sessions. Drop one step (${fmtW(ex.inc)} kg) and build back up to the top of the range.` });
+      out.push({ id: `stall-${ex.id}`, tone: "nudge", ex: ex.id, text: `${ex.name} hasn't beaten its best in ${stuck} sessions. Drop one step (${fmtW(ex.inc)} kg) and build back up to the top of the range.` });
       continue;
     }
     const month = p.filter((x) => daysBetween(x.date) <= 30 && x.mode === "normal");
     const older = p.filter((x) => daysBetween(x.date) > 30 && x.mode === "normal");
     if (month.length && older.length) {
       const gain = Math.max(...month.map((x) => x.top.w)) - Math.max(...older.slice(-3).map((x) => x.top.w));
-      if (gain > 0) out.push({ id: `gain-${ex.id}`, tone: "good", ex: ex.id, text: `${ex.short} is up ${fmtW(gain)} kg on the top set this month.` });
+      if (gain > 0) out.push({ id: `gain-${ex.id}`, tone: "good", ex: ex.id, text: `${ex.name} is up ${fmtW(gain)} kg on the top set this month.` });
     }
   }
 

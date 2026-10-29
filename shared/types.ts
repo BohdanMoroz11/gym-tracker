@@ -7,15 +7,15 @@ export type Mode = "normal" | "deload" | "comeback";
 
 export interface Exercise {
   id: string;
-  name: string; // full name, e.g. "Core rotation machine"
-  short: string; // what the owner calls it, e.g. "Rotation"
+  name: string; // proper name, e.g. "Core rotation"; equipment is shown separately
   group: Group;
   kind: Kind;
-  inc: number; // kg per step on this machine / dumbbell rack
+  inc: number; // kg per progression step ("go up"); the stepper uses 0.5 for free weights
   range: [number, number]; // default rep target
   note?: string; // standing note: seat position, grip...
   day?: DayId; // which day it usually belongs to
   archived?: boolean;
+  oneoff?: boolean; // typed in for one session, never listed
 }
 
 export interface SetLog {
@@ -49,6 +49,7 @@ export interface Session {
   mode: Mode;
   entries: Entry[];
   note?: string;
+  feel?: { body?: number; mind?: number }; // 1-5, asked when finishing
   approx?: boolean; // imported with a guessed date
 }
 

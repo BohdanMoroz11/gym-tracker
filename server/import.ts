@@ -22,11 +22,11 @@ if (db.sessions.length && !force) {
   console.error(`data/gym.json already has ${db.sessions.length} sessions. Use --force to replace them.`);
   process.exit(1);
 }
-const fresh = force ? { ...emptyDB(), exercises: db.exercises } : db;
+const fresh = force ? emptyDB() : db;
 const m = exMap(fresh);
 // The owner's shorthand ("hummers", "rotation"...) lives in the gitignored private/aliases.json; otherwise match by name.
 const ALIASES: Record<string, string> = fs.existsSync("private/aliases.json") ? JSON.parse(fs.readFileSync("private/aliases.json", "utf8")) : {};
-for (const e of fresh.exercises) ALIASES[e.short.toLowerCase()] ??= e.id;
+for (const e of fresh.exercises) ALIASES[e.name.toLowerCase()] ??= e.id;
 
 const blocks = fs
   .readFileSync(file, "utf8")

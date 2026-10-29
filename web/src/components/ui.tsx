@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from "react";
-import { fmtW } from "../../../shared/logic.ts";
+import { useEffect, useState, type ReactNode } from "react";
+import type { Exercise } from "../../../shared/types.ts";
+import { fmtW, isFree, stepOf } from "../../../shared/logic.ts";
 import { cx } from "../lib.ts";
 
 /** Bottom sheet on phones, centered dialog on wider screens. */
@@ -17,68 +18,143 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-label={title}
-        className="safe-b flex max-h-[88dvh] w-full flex-col rounded-t-2xl bg-mat sm:max-w-lg sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="-mr-2 rounded-full px-3 py-1 text-mute hover:text-chalk" aria-label="Close">
+      <div role="dialog" aria-label={title} className="safe-b flex max-h-[90dvh] w-full flex-col rounded-t-3xl bg-mat sm:max-w-lg sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
+          <h2 className="text-xl font-semibold">{title}</h2>
+          <button onClick={onClose} className={cx(pill, "-mr-1")}>
             Close
           </button>
         </div>
-        <div className="overflow-y-auto px-5 pb-5">{children}</div>
+        {/* p-1 inside the scroller so focus rings and outlines aren't clipped */}
+        <div className="overflow-y-auto px-4 pt-1 pb-6">{children}</div>
       </div>
     </div>
   );
 }
 
-/** − 12.5 kg + : big targets for sweaty thumbs. */
-export function WeightStepper({ value, step, onChange, size = "md" }: { value: number; step: number; onChange: (w: number) => void; size?: "md" | "lg" }) {
-  const s = step || 1;
-  const btn = cx("grid place-items-center rounded-xl bg-rule text-2xl leading-none text-chalk active:bg-mute/40", size === "lg" ? "h-12 w-12" : "h-10 w-10");
+/** Secondary button: always visibly a button (filled, 44px tall). */
+export const pill = "inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-bench px-4 font-medium text-chalk active:bg-rule hover:bg-rule";
+export const pillSm = "inline-flex h-10 items-center justify-center rounded-lg bg-bench px-3 text-sm font-medium text-chalk active:bg-rule hover:bg-rule";
+export const input = "block h-12 w-full min-w-0 appearance-none rounded-xl bg-floor px-3.5 text-base text-chalk placeholder:text-faint outline-none ring-inset focus:ring-2 focus:ring-mute";
+
+/** "15kg" in display type with a smaller unit. */
+export const Kg = ({ w, className }: { w: number; className?: string }) => (
+  <span className={cx("num", className)}>
+    {fmtW(w)}
+    <span className="ml-[0.08em] text-[0.62em] font-semibold text-mute">kg</span>
+  </span>
+);
+
+/**
+ * − weight + with the number itself tappable to type any value.
+ * Free weights step by 0.5 and get jump buttons for a new pair of dumbbells or a plate.
+ */
+export function WeightStepper({ value, ex, onChange }: { value: number; ex: Exercise; onChange: (w: number) => void }) {
+  const step = stepOf(ex);
+  const [typing, setTyping] = useState(false);
+  const set = (w: number) => onChange(Math.max(0, +w.toFixed(2)));
+  const btn = "grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-rule text-3xl leading-none text-chalk active:bg-mute/50";
   return (
-    <div className="flex items-center gap-2">
-      <button className={btn} onClick={() => onChange(Math.max(0, +(value - s).toFixed(2)))} aria-label={`Minus ${fmtW(s)} kg`}>
-        −
-      </button>
-      <div className={cx("num min-w-[4.5ch] text-center", size === "lg" ? "text-4xl" : "text-3xl")}>
-        {fmtW(value)}
-        <span className="ml-0.5 font-sans text-sm font-medium text-mute">kg</span>
+    <div className="space-y-2">
+      <div className="flex items-center justify-center gap-3">
+        <button className={btn} onClick={() => set(value - step)} aria-label={`Minus ${fmtW(step)} kg`}>
+          −
+        </button>
+        {typing ? (
+          <input
+            autoFocus
+            inputMode="decimal"
+            defaultValue={fmtW(value)}
+            onFocus={(e) => e.target.select()}
+            onBlur={(e) => {
+              const v = parseFloat(e.target.value.replace(",", "."));
+              if (!isNaN(v)) set(v);
+              setTyping(false);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+            className="num h-14 w-32 rounded-2xl bg-floor text-center text-4xl text-chalk outline-none ring-2 ring-chalk ring-inset"
+            aria-label="Weight in kg"
+          />
+        ) : (
+          <button onClick={() => setTyping(true)} className="h-14 w-32 rounded-2xl border-2 border-dashed border-rule text-4xl" aria-label={`${fmtW(value)} kg, tap to type`}>
+            <Kg w={value} />
+          </button>
+        )}
+        <button className={btn} onClick={() => set(value + step)} aria-label={`Plus ${fmtW(step)} kg`}>
+          +
+        </button>
       </div>
-      <button className={btn} onClick={() => onChange(+(value + s).toFixed(2))} aria-label={`Plus ${fmtW(s)} kg`}>
-        +
-      </button>
+      {isFree(ex) && (
+        <div className="flex justify-center gap-2">
+          {[-5, -2.5, 2.5, 5].map((d) => (
+            <button key={d} onClick={() => set(value + d)} className="num h-10 min-w-14 rounded-lg bg-floor/70 px-2 text-lg text-mute active:bg-rule" aria-label={`${d > 0 ? "Plus" : "Minus"} ${Math.abs(d)} kg`}>
+              {d > 0 ? "+" : "−"}
+              {Math.abs(d)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Equal-width choice buttons. */
+export function Choice<T extends string | number>({ value, options, onChange, size = "md" }: { value: T | undefined; options: { value: T; label: ReactNode; sub?: string }[]; onChange: (v: T) => void; size?: "md" | "lg" }) {
+  return (
+    <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={String(o.value)}
+            onClick={() => onChange(o.value)}
+            aria-pressed={on}
+            className={cx(
+              "flex flex-col items-center justify-center rounded-xl px-1 leading-tight font-medium",
+              size === "lg" ? "h-16" : "h-12 text-[15px]",
+              on ? "bg-chalk text-floor" : "bg-bench text-chalk active:bg-rule hover:bg-rule",
+            )}
+          >
+            {o.label}
+            {o.sub && <span className={cx("mt-0.5 text-xs font-normal", on ? "text-floor/70" : "text-mute")}>{o.sub}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div className="inline-flex rounded-xl bg-floor p-1">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={cx("rounded-lg px-3 py-1.5 text-sm font-medium", o.value === value ? "bg-bench text-chalk" : "text-mute hover:text-chalk")}
-          aria-pressed={o.value === value}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <Choice value={value} options={options} onChange={onChange} />;
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-sm text-mute">{label}</span>
+    <label className="block min-w-0">
+      <span className="mb-1.5 block text-sm text-mute">{label}</span>
       {children}
     </label>
   );
 }
 
-export const input = "w-full rounded-xl bg-floor px-3 py-2.5 text-chalk placeholder:text-faint outline-none focus:ring-2 focus:ring-rule";
+/** Rep-range chips, wrap instead of scroll so nothing gets cut. */
+export const RANGES: [number, number][] = [
+  [5, 8],
+  [8, 10],
+  [10, 12],
+  [12, 15],
+  [15, 20],
+];
+export function RangePicker({ lo, hi, onChange }: { lo: number; hi: number; onChange: (lo: number, hi: number) => void }) {
+  const known = RANGES.some(([a, b]) => a === lo && b === hi);
+  const opts = known ? RANGES : [...RANGES, [lo, hi] as [number, number]].sort((a, b) => a[0] - b[0]);
+  return (
+    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+      {opts.map(([a, b]) => (
+        <button key={`${a}-${b}`} onClick={() => onChange(a, b)} className={cx("num h-12 rounded-xl text-xl", a === lo && b === hi ? "bg-chalk text-floor" : "bg-floor text-chalk active:bg-rule")}>
+          {a}–{b}
+        </button>
+      ))}
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DayId, DB, Group } from "../../../shared/types.ts";
-import { DAYS, daysBetween, fmtDate, fmtW, GROUP_LABEL, logged, series, setsByGroup, stalledFor, tips, trend, weekStart, weekStreak, type Point, type Tip, type Trend } from "../../../shared/logic.ts";
+import { DAYS, daysBetween, fmtDate, fmtW, GROUP_LABEL, KIND_LABEL, logged, series, setsByGroup, stalledFor, tips, trend, weekStart, weekStreak, type Point, type Tip, type Trend } from "../../../shared/logic.ts";
 import { cx, dayColor, go } from "../lib.ts";
 
 export function ProgressPage({ db }: { db: DB }) {
@@ -170,7 +170,7 @@ const TREND: Record<Trend, { label: string; icon: string; cls: string }> = {
 
 function ExerciseList({ db }: { db: DB }) {
   const rows = db.exercises
-    .filter((e) => !e.archived)
+    .filter((e) => !e.archived && !e.oneoff)
     .map((e) => ({ e, p: series(db, e.id) }))
     .filter((x) => x.p.length);
   const groups: (DayId | "other")[] = ["back", "chest", "legs", "other"];
@@ -194,11 +194,11 @@ function ExerciseList({ db }: { db: DB }) {
                 return (
                   <button key={e.id} onClick={() => go(`/ex/${e.id}`)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-bench">
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium">{e.short}</div>
+                      <div className="font-medium">{e.name}</div>
                       <div className="text-sm text-mute">
-                        best set{" "}
+                        {KIND_LABEL[e.kind]}, best{" "}
                         <span className="num text-base text-chalk">
-                          {fmtW(last.top.w)}×{last.top.r}
+                          {fmtW(last.top.w)}kg × {last.top.r}
                         </span>{" "}
                         {daysBetween(last.date) > 0 && !last.approx ? `· ${daysBetween(last.date)}d ago` : ""}
                       </div>

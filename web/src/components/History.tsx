@@ -2,8 +2,8 @@ import { useState } from "react";
 import type { DB, Mode, Session } from "../../../shared/types.ts";
 import { DAYS, done, exMap, fmtDate, fmtSets } from "../../../shared/logic.ts";
 import { cx, dayColor, go, useDeleteSession, useSaveSession } from "../lib.ts";
-import { SessionEditor } from "./Session.tsx";
-import { Field, input, Segmented } from "./ui.tsx";
+import { FEEL, Rating, SessionEditor } from "./Session.tsx";
+import { Field, input, pill, Segmented } from "./ui.tsx";
 
 export function HistoryPage({ db }: { db: DB }) {
   const sessions = done(db);
@@ -41,12 +41,18 @@ export function HistoryPage({ db }: { db: DB }) {
                   <div className="mt-2 space-y-0.5 text-sm">
                     {s.entries.map((e, i) => (
                       <p key={i} className={cx("truncate", !e.sets.length && "text-faint")}>
-                        <span className={e.sets.length ? "text-mute" : ""}>{m.get(e.ex)?.short ?? e.ex}</span> {e.sets.length ? fmtSets(e.sets) : "skipped"}
+                        <span className={e.sets.length ? "text-mute" : ""}>{m.get(e.ex)?.name ?? e.ex}</span> {e.sets.length ? fmtSets(e.sets) : "skipped"}
                         {e.note && <span className="text-faint"> ({e.note})</span>}
                       </p>
                     ))}
                   </div>
-                  {s.note && <p className="mt-2 text-sm text-mute">“{s.note}”</p>}
+                  {(s.feel || s.note) && (
+                    <p className="mt-2 text-sm text-mute">
+                      {s.feel?.body && <>Body {FEEL.body[s.feel.body - 1].toLowerCase()}. </>}
+                      {s.feel?.mind && <>Head {FEEL.mind[s.feel.mind - 1].toLowerCase()}. </>}
+                      {s.note && <>“{s.note}”</>}
+                    </p>
+                  )}
                 </button>
               );
             })}
@@ -57,10 +63,9 @@ export function HistoryPage({ db }: { db: DB }) {
   );
 }
 
-const toLocalInput = (iso: string) => {
-  const d = new Date(iso);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
+const pad = (n: number) => String(n).padStart(2, "0");
+const dateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const timeStr = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 export function SessionPage({ db, id }: { db: DB; id: string }) {
   const save = useSaveSession();
@@ -72,32 +77,53 @@ export function SessionPage({ db, id }: { db: DB; id: string }) {
     go("/");
     return null;
   }
-  const length = new Date(s.end).getTime() - new Date(s.date).getTime();
+  const start = new Date(s.date);
+  const end = new Date(s.end);
+  const mins = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
+  /** Moving the date or start time keeps the length; length is changed on its own. */
+  const setStart = (date: string, time: string) => {
+    const d = new Date(`${date}T${time}`);
+    if (isNaN(d.getTime())) return;
+    save({ ...s, date: d.toISOString(), end: new Date(d.getTime() + mins * 60000).toISOString() });
+  };
+  const setLength = (m: number) => save({ ...s, end: new Date(start.getTime() + Math.max(5, m) * 60000).toISOString() });
 
   return (
     <div className="mx-auto max-w-2xl pt-4 pb-10">
-      <button onClick={() => history.back()} className="text-sm text-mute hover:text-chalk">
+      <button onClick={() => history.back()} className={pill}>
         ‹ Back
       </button>
-      <div className="mt-2 flex items-center gap-3">
-        <span className="h-10 w-2 rounded-full" style={{ background: dayColor(s.day) }} />
+      <div className="mt-4 flex items-center gap-3">
+        <span className="h-10 w-2 shrink-0 rounded-full" style={{ background: dayColor(s.day) }} />
         <h1 className="num text-4xl uppercase">{s.day ? DAYS[s.day].label : "Session"}</h1>
       </div>
 
-      <div className="mt-4 grid gap-3 rounded-2xl bg-mat p-4 sm:grid-cols-2">
-        <Field label={s.approx ? "Date (a guess, fix it if you remember)" : "Started"}>
-          <input
-            type="datetime-local"
-            className={input}
-            value={toLocalInput(s.date)}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              const date = new Date(e.target.value).toISOString();
-              save({ ...s, date, end: new Date(new Date(date).getTime() + length).toISOString() });
-            }}
-          />
-        </Field>
-        <Field label="Kind">
+      <div className="mt-4 space-y-5 rounded-2xl bg-mat p-4">
+        {s.approx && <p className="text-sm text-mute">From your old notes. The date is a guess; fix it if you remember.</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Day">
+            <input type="date" className={input} value={dateStr(start)} onChange={(e) => e.target.value && setStart(e.target.value, timeStr(start))} />
+          </Field>
+          <Field label="Started">
+            <input type="time" className={input} value={timeStr(start)} onChange={(e) => e.target.value && setStart(dateStr(start), e.target.value)} />
+          </Field>
+        </div>
+        <div>
+          <div className="mb-1.5 text-sm text-mute">Length</div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setLength(mins - 5)} className={cx(pill, "h-12 w-16 shrink-0 px-0")} aria-label="5 minutes shorter">
+              −5
+            </button>
+            <div className="num flex h-12 min-w-0 flex-1 items-center justify-center rounded-xl bg-floor text-2xl">
+              {mins} min <span className="ml-2 font-sans text-sm font-normal text-mute">until {timeStr(end)}</span>
+            </div>
+            <button onClick={() => setLength(mins + 5)} className={cx(pill, "h-12 w-16 shrink-0 px-0")} aria-label="5 minutes longer">
+              +5
+            </button>
+          </div>
+        </div>
+        <div>
+          <div className="mb-1.5 text-sm text-mute">Kind</div>
           <Segmented<Mode>
             value={s.mode}
             onChange={(mode) => save({ ...s, mode })}
@@ -107,14 +133,14 @@ export function SessionPage({ db, id }: { db: DB; id: string }) {
               { value: "deload", label: "Deload" },
             ]}
           />
-        </Field>
-        <div className="sm:col-span-2">
-          <Field label="Session note">
-            <input className={input} value={s.note ?? ""} placeholder="Nothing noted" onChange={(e) => save({ ...s, note: e.target.value || undefined })} />
-          </Field>
         </div>
+        <Rating label="Body" words={FEEL.body} value={s.feel?.body} onChange={(body) => save({ ...s, feel: { ...s.feel, body } })} />
+        <Rating label="Head" words={FEEL.mind} value={s.feel?.mind} onChange={(mind) => save({ ...s, feel: { ...s.feel, mind } })} />
+        <Field label="Session note">
+          <input className={input} value={s.note ?? ""} placeholder="Nothing noted" onChange={(e) => save({ ...s, note: e.target.value || undefined })} />
+        </Field>
         {s.approx && (
-          <button onClick={() => save({ ...s, approx: undefined })} className="justify-self-start rounded-lg text-sm text-mute hover:text-chalk sm:col-span-2">
+          <button onClick={() => save({ ...s, approx: undefined })} className={cx(pill, "h-auto w-full py-3 text-left")}>
             These numbers are right, count this session in stats
           </button>
         )}
@@ -129,7 +155,7 @@ export function SessionPage({ db, id }: { db: DB; id: string }) {
           del(s.id);
           go("/history");
         }}
-        className="mt-8 text-sm text-mute hover:text-red"
+        className={cx(pill, "mt-8 w-full bg-transparent", sure ? "text-red" : "text-mute")}
       >
         {sure ? "Tap again to delete this session for good" : "Delete session"}
       </button>
