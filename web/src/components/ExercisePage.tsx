@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { DayId, DB, Exercise, Group, Kind } from "../../../shared/types.ts";
-import { DAYS, fmtDate, fmtSets, fmtTargets, fmtW, GROUP_LABEL, history, KIND_LABEL, nextOf, series, type Point } from "../../../shared/logic.ts";
-import { cx, dayColor, go, useSaveExercise } from "../lib.ts";
-import { Field, input, pill } from "./ui.tsx";
+import type { DB, Exercise } from "../../../shared/types.ts";
+import { equipLabel, fmtDate, fmtSets, fmtTargets, fmtW, history, nextOf, programsWith, series, type Point } from "../../../shared/logic.ts";
+import { COLOR_VAR, go, useSaveExercise } from "../lib.ts";
+import { ExerciseForm } from "./Exercises.tsx";
+import { pill, Toggle } from "./ui.tsx";
 
 export function ExercisePage({ db, id }: { db: DB; id: string }) {
   const ex = db.exercises.find((e) => e.id === id);
@@ -15,10 +16,10 @@ export function ExercisePage({ db, id }: { db: DB; id: string }) {
         ‹ Back
       </button>
       <div className="mt-2 flex items-center gap-3">
-        <span className="h-10 w-2 rounded-full" style={{ background: dayColor(ex.day) }} />
+        <span className="h-10 w-2 shrink-0 rounded-full" style={{ background: programsWith(db, ex.id)[0] ? COLOR_VAR[programsWith(db, ex.id)[0].color] : "var(--color-faint)" }} />
         <div>
           <h1 className="num text-4xl leading-none uppercase">{ex.name}</h1>
-          <p className="text-mute">{KIND_LABEL[ex.kind]}</p>
+          <p className="text-mute">{equipLabel(ex)}</p>
         </div>
       </div>
       {ex.note && <p className="mt-4 rounded-xl border-l-4 border-chalk bg-mat px-3.5 py-3 text-[17px] whitespace-pre-line">{ex.note}</p>}
@@ -55,72 +56,22 @@ export function ExercisePage({ db, id }: { db: DB; id: string }) {
   );
 }
 
-const history_back = () => (window.history.length > 1 ? window.history.back() : go("/progress"));
+const history_back = () => (window.history.length > 1 ? window.history.back() : go("/exercises"));
 
 function Settings({ ex }: { ex: Exercise }) {
   const save = useSaveExercise();
   const [e, setE] = useState(ex);
   const t = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const set = (patch: Partial<Exercise>) => {
-    const next = { ...e, ...patch };
+  const set = (next: Exercise) => {
     setE(next);
     clearTimeout(t.current);
     t.current = setTimeout(() => save(next), 400);
   };
-  const num = (v: string) => (v === "" ? 0 : Number(v));
   return (
-    <section className="space-y-3 self-start rounded-2xl bg-mat p-4">
+    <section className="space-y-4 self-start rounded-2xl bg-mat p-4">
       <h2 className="font-semibold">Setup</h2>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
-          <Field label="Name">
-            <input className={input} value={e.name} onChange={(x) => set({ name: x.target.value })} />
-          </Field>
-        </div>
-        <Field label="Go-up step, kg">
-          <input className={input} inputMode="decimal" value={e.inc} onChange={(x) => set({ inc: num(x.target.value) })} />
-        </Field>
-        <Field label="Usual reps">
-          <div className="flex items-center gap-1">
-            <input className={input} inputMode="numeric" value={e.range[0]} onChange={(x) => set({ range: [num(x.target.value), e.range[1]] })} />
-            <span className="text-mute">–</span>
-            <input className={input} inputMode="numeric" value={e.range[1]} onChange={(x) => set({ range: [e.range[0], num(x.target.value)] })} />
-          </div>
-        </Field>
-        <Field label="Muscle">
-          <select className={input} value={e.group} onChange={(x) => set({ group: x.target.value as Group })}>
-            {Object.entries(GROUP_LABEL).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Day">
-          <select className={input} value={e.day ?? ""} onChange={(x) => set({ day: (x.target.value || undefined) as DayId | undefined })}>
-            <option value="">Any</option>
-            {(Object.keys(DAYS) as DayId[]).map((d) => (
-              <option key={d} value={d}>
-                {DAYS[d].label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Equipment">
-          <select className={input} value={e.kind} onChange={(x) => set({ kind: x.target.value as Kind })}>
-            {["machine", "cable", "dumbbell", "barbell", "bodyweight"].map((k) => (
-              <option key={k}>{k}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <Field label="Note that stays (seat position, form cue)">
-        <textarea rows={3} className={cx(input, "h-auto py-3")} value={e.note ?? ""} placeholder="Shown on the exercise every session" onChange={(x) => set({ note: x.target.value || undefined })} />
-      </Field>
-      <p className="text-sm text-faint">The go-up step is what “Up on set 2” and “All up” add. Free weights always move 0.5 kg on the − + buttons; machines move by the step.</p>
-      <button onClick={() => set({ archived: !e.archived })} className="text-sm text-mute hover:text-chalk">
-        {e.archived ? "Bring back to the exercise list" : "Hide from the exercise list"}
-      </button>
+      <ExerciseForm value={e} onChange={set} />
+      <Toggle label="Hidden" sub="Leaves the lists. History stays." value={!!e.archived} onChange={(archived) => set({ ...e, archived: archived || undefined })} />
     </section>
   );
 }

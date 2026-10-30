@@ -4,15 +4,19 @@ import { TodayPage } from "./components/Today.tsx";
 import { HistoryPage, SessionPage } from "./components/History.tsx";
 import { ProgressPage } from "./components/Progress.tsx";
 import { ExercisePage } from "./components/ExercisePage.tsx";
+import { ProgramPage } from "./components/Program.tsx";
+import { ExercisesPage } from "./components/Exercises.tsx";
 
 export function App() {
   const { data: db, error, refetch } = useDB();
   const [page, id] = useRoute();
   const live = db && active(db);
-  const tab = page === "history" || page === "s" ? "history" : page === "progress" || page === "ex" ? "progress" : "today";
+  const tab = page === "history" || page === "s" ? "history" : page === "progress" ? "progress" : page === "program" ? "program" : page === "exercises" || page === "ex" ? "exercises" : "today";
 
   const tabs = [
     { key: "today", href: "/", label: live ? "Session" : "Today" },
+    { key: "program", href: "/program", label: "Program" },
+    { key: "exercises", href: "/exercises", label: "Exercises" },
     { key: "history", href: "/history", label: "History" },
     { key: "progress", href: "/progress", label: "Progress" },
   ];
@@ -25,7 +29,7 @@ export function App() {
           <span className="num mr-6 text-2xl uppercase">Gym</span>
           {tabs.map((t) => (
             <a key={t.key} href={"#" + t.href} className={cx("flex items-center gap-2 rounded-lg px-3 py-1.5 font-medium", tab === t.key ? "bg-mat text-chalk" : "text-mute hover:text-chalk")}>
-              {t.key === "today" && live && <span className="h-2 w-2 rounded-full" style={{ background: dayColor(live.day) }} />}
+              {t.key === "today" && live && db && <span className="h-2 w-2 rounded-full" style={{ background: dayColor(db, live.day) }} />}
               {t.label}
             </a>
           ))}
@@ -49,6 +53,10 @@ export function App() {
           <SessionPage db={db} id={id} />
         ) : page === "progress" ? (
           <ProgressPage db={db} />
+        ) : page === "program" ? (
+          <ProgramPage db={db} />
+        ) : page === "exercises" ? (
+          <ExercisesPage db={db} />
         ) : page === "ex" && id ? (
           <ExercisePage db={db} id={id} />
         ) : (
@@ -60,8 +68,8 @@ export function App() {
       <nav className="safe-b fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-floor/95 backdrop-blur sm:hidden">
         <div className="flex">
           {tabs.map((t) => (
-            <button key={t.key} onClick={() => go(t.href)} className={cx("flex flex-1 flex-col items-center gap-1 pt-2.5 pb-2 text-sm font-medium", tab === t.key ? "text-chalk" : "text-faint")}>
-              <span className="h-1 w-6 rounded-full" style={{ background: tab === t.key ? (t.key === "today" && live ? dayColor(live.day) : "var(--color-chalk)") : "transparent" }} />
+            <button key={t.key} onClick={() => go(t.href)} className={cx("flex min-w-0 flex-1 flex-col items-center gap-1 pt-2.5 pb-2 text-[13px] font-medium", tab === t.key ? "text-chalk" : "text-faint")}>
+              <span className="h-1 w-6 rounded-full" style={{ background: tab === t.key ? (t.key === "today" && live && db ? dayColor(db, live.day) : "var(--color-chalk)") : "transparent" }} />
               {t.label}
             </button>
           ))}

@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DB, Exercise, Session } from "../../shared/types.ts";
+import type { Color, DB, Exercise, Program, Session } from "../../shared/types.ts";
 
 // ---------- data + offline-tolerant saving ----------
 // Gym wifi and SSH tunnels drop. Every session save goes to localStorage first ("pending"),
@@ -108,13 +108,28 @@ export function useDeleteSession() {
 export function useSaveExercise() {
   const qc = useQueryClient();
   return async (e: Exercise) => {
-    qc.setQueryData<DB>(["db"], (db) => db && { ...db, exercises: [...db.exercises.filter((x) => x.id !== e.id), e] });
+    qc.setQueryData<DB>(["db"], (db) => db && { ...db, exercises: db.exercises.some((x) => x.id === e.id) ? db.exercises.map((x) => (x.id === e.id ? e : x)) : [...db.exercises, e] });
     await fetch(`/api/exercises/${e.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(e) });
   };
 }
 
+export function useSaveProgram() {
+  const qc = useQueryClient();
+  return async (p: Program) => {
+    qc.setQueryData<DB>(["db"], (db) => db && { ...db, programs: db.programs.some((x) => x.id === p.id) ? db.programs.map((x) => (x.id === p.id ? p : x)) : [...db.programs, p] });
+    await fetch(`/api/programs/${p.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(p) });
+  };
+}
+export function useDeleteProgram() {
+  const qc = useQueryClient();
+  return async (id: string) => {
+    qc.setQueryData<DB>(["db"], (db) => db && { ...db, programs: db.programs.filter((x) => x.id !== id) });
+    await fetch(`/api/programs/${id}`, { method: "DELETE" });
+  };
+}
+
 // ---------- routing ----------
-// #/ today · #/history · #/s/:id session · #/progress · #/ex/:id exercise
+// #/ today · #/program · #/exercises · #/history · #/s/:id session · #/progress · #/ex/:id exercise
 
 export function useRoute(): string[] {
   const get = () => location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -150,7 +165,11 @@ export const clock = (ms: number) => {
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 };
 
-export const DAY_COLOR = { back: "var(--color-blue)", chest: "var(--color-red)", legs: "var(--color-yellow)" } as const;
-export const dayColor = (d: string | null | undefined) => (d && d in DAY_COLOR ? DAY_COLOR[d as keyof typeof DAY_COLOR] : "var(--color-faint)");
+export const COLOR_VAR: Record<Color, string> = { blue: "var(--color-blue)", red: "var(--color-red)", yellow: "var(--color-yellow)", chalk: "var(--color-chalk)" };
+/** A program's plate color; free sessions are grey. */
+export const dayColor = (db: DB, id: string | null | undefined) => {
+  const p = id ? db.programs.find((x) => x.id === id) : undefined;
+  return p ? COLOR_VAR[p.color] : "var(--color-faint)";
+};
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");

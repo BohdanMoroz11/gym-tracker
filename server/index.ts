@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Exercise, Session } from "../shared/types.ts";
+import type { Exercise, Program, Session } from "../shared/types.ts";
 import { load, save } from "./store.ts";
 
 const PORT = Number(process.env.PORT ?? 5200);
@@ -38,6 +38,24 @@ app.put("/api/exercises/:id", (req, res) => {
   const i = db.exercises.findIndex((x) => x.id === e.id);
   if (i >= 0) db.exercises[i] = e;
   else db.exercises.push(e);
+  save();
+  res.json({ ok: true });
+});
+
+app.put("/api/programs/:id", (req, res) => {
+  const p = req.body as Program;
+  if (!p?.id || p.id !== req.params.id || !p.name || !Array.isArray(p.items)) return res.status(400).json({ error: "bad program" });
+  const db = load();
+  const i = db.programs.findIndex((x) => x.id === p.id);
+  if (i >= 0) db.programs[i] = p;
+  else db.programs.push(p);
+  save();
+  res.json({ ok: true });
+});
+
+app.delete("/api/programs/:id", (req, res) => {
+  const db = load();
+  db.programs = db.programs.filter((x) => x.id !== req.params.id);
   save();
   res.json({ ok: true });
 });

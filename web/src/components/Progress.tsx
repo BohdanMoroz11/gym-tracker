@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DayId, DB, Group } from "../../../shared/types.ts";
-import { DAYS, daysBetween, fmtDate, fmtW, GROUP_LABEL, KIND_LABEL, logged, series, setsByGroup, stalledFor, tips, trend, weekStart, weekStreak, type Point, type Tip, type Trend } from "../../../shared/logic.ts";
+import type { DB, Group } from "../../../shared/types.ts";
+import { daysBetween, equipLabel, fmtDate, fmtW, GROUP_LABEL, logged, programOf, programsWith, sessionLabel, series, setsByGroup, stalledFor, tips, trend, weekStart, weekStreak, type Point, type Tip, type Trend } from "../../../shared/logic.ts";
 import { cx, dayColor, go } from "../lib.ts";
 
 export function ProgressPage({ db }: { db: DB }) {
@@ -77,8 +77,8 @@ export function TipList({ tips, db }: { tips: Tip[]; db: DB }) {
 /** Week columns (Mon at the top), newest on the right. Imported sessions are left out: their dates are guesses. */
 function Calendar({ db }: { db: DB }) {
   const WEEKS = 26;
-  const byDay = new Map<string, { day: DayId | null; id: string }>();
-  for (const s of logged(db)) byDay.set(new Date(s.date).toDateString(), { day: s.day, id: s.id });
+  const byDay = new Map<string, { day: string | null; id: string; label: string }>();
+  for (const s of logged(db)) byDay.set(new Date(s.date).toDateString(), { day: s.day, id: s.id, label: sessionLabel(db, s) });
   const start = weekStart(new Date());
   start.setDate(start.getDate() - (WEEKS - 1) * 7);
   const ref = useRef<HTMLDivElement>(null);
@@ -94,7 +94,6 @@ function Calendar({ db }: { db: DB }) {
       return x;
     }),
   );
-  const letter = { back: "B", chest: "C", legs: "L" } as const;
 
   return (
     <div className="rounded-2xl bg-mat p-4">
@@ -106,7 +105,7 @@ function Calendar({ db }: { db: DB }) {
               {days.map((d) => {
                 const s = byDay.get(d.toDateString());
                 const future = d > new Date();
-                const label = `${fmtDate(d.toISOString())}: ${s ? (s.day ? DAYS[s.day].label : "Session") : "rest"}`;
+                const label = `${fmtDate(d.toISOString())}: ${s ? s.label : "rest"}`;
                 return s ? (
                   <button
                     key={d.getTime()}
@@ -115,10 +114,10 @@ function Calendar({ db }: { db: DB }) {
                     onFocus={() => setHover(label)}
                     onMouseLeave={() => setHover(null)}
                     className="grid h-[18px] w-[18px] place-items-center rounded-[4px] text-[10px] font-bold text-floor"
-                    style={{ background: dayColor(s.day) }}
+                    style={{ background: dayColor(db, s.day) }}
                     aria-label={label}
                   >
-                    {s.day ? letter[s.day] : ""}
+                    {programOf(db, s.day)?.name.charAt(0).toUpperCase() ?? ""}
                   </button>
                 ) : (
                   <span key={d.getTime()} className={cx("h-[18px] w-[18px] rounded-[4px]", future ? "bg-transparent" : "bg-bench/70")} />
@@ -129,10 +128,10 @@ function Calendar({ db }: { db: DB }) {
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-mute">
-        {(["back", "chest", "legs"] as const).map((d) => (
-          <span key={d} className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-[3px]" style={{ background: dayColor(d) }} />
-            {DAYS[d].label}
+        {db.programs.map((p) => (
+          <span key={p.id} className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-[3px]" style={{ background: dayColor(db, p.id) }} />
+            {p.name}
           </span>
         ))}
         <span className="flex-1" />
@@ -144,7 +143,8 @@ function Calendar({ db }: { db: DB }) {
 
 function Balance({ db }: { db: DB }) {
   const g = setsByGroup(db, 28);
-  const rows: Group[] = ["back", "traps", "biceps", "chest", "shoulders", "triceps", "core", "legs"];
+  // Legs only show up once there are leg sets.
+  const rows = (["back", "traps", "biceps", "chest", "shoulders", "triceps", "core", "legs"] as Group[]).filter((r) => r !== "legs" || g.legs > 0);
   const max = Math.max(40, ...rows.map((r) => g[r]));
   return (
     <div className="space-y-2 rounded-2xl bg-mat p-4">
@@ -173,18 +173,19 @@ function ExerciseList({ db }: { db: DB }) {
     .filter((e) => !e.archived && !e.oneoff)
     .map((e) => ({ e, p: series(db, e.id) }))
     .filter((x) => x.p.length);
-  const groups: (DayId | "other")[] = ["back", "chest", "legs", "other"];
+  const groups = [...db.programs.map((p) => ({ id: p.id, name: p.name })), { id: "other", name: "Other" }];
+  const home = (exId: string) => programsWith(db, exId)[0]?.id ?? "other";
   if (!rows.length) return <p className="text-sm text-mute">Log a few sessions and each exercise gets its own trend here.</p>;
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {groups.map((g) => {
-        const rs = rows.filter((x) => (x.e.day ?? "other") === g);
+        const rs = rows.filter((x) => home(x.e.id) === g.id);
         if (!rs.length) return null;
         return (
-          <div key={g}>
+          <div key={g.id}>
             <h3 className="mb-2 flex items-center gap-2 text-sm text-mute">
-              <span className="h-3 w-1.5 rounded-full" style={{ background: dayColor(g === "other" ? null : g) }} />
-              {g === "other" ? "Other" : DAYS[g].label}
+              <span className="h-3 w-1.5 rounded-full" style={{ background: dayColor(db, g.id === "other" ? null : g.id) }} />
+              {g.name}
             </h3>
             <div className="divide-y divide-rule/60 rounded-2xl bg-mat">
               {rs.map(({ e, p }) => {
@@ -196,7 +197,7 @@ function ExerciseList({ db }: { db: DB }) {
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">{e.name}</div>
                       <div className="text-sm text-mute">
-                        {KIND_LABEL[e.kind]}, best{" "}
+                        {equipLabel(e)}, best{" "}
                         <span className="num text-base text-chalk">
                           {fmtW(last.top.w)}kg × {last.top.r}
                         </span>{" "}

@@ -4,29 +4,34 @@
 
 A personal gym log that replaces a messy phone note. It remembers what you did last time, fills in today, and turns "go up / stay / drop on the second" into a plan the next session picks up. Logging a set is one tap.
 
+**Program**: each day type (back day, chest day, add your own) is a list of exercises in order. Edit it any time, or mid-session behind the Edit switch. Weights and reps aren't part of it: they carry over from the last session.
+
+**Exercises**: the exercise database. Name, equipment (pin-stack machine, plate-loaded machine, cable, dumbbells, barbell, bodyweight), one side at a time or both, weight step, usual rep goal and a note that stays.
+
 **Today**
-- The day that's due (back and chest alternate), with every exercise's targets for today, e.g. `Incline 15×8–10, 12.5×12–15`.
-- Normal, lighter (comeback after a break, ~15% off) or deload (~40% off; doesn't move your targets).
+- The day type that's due, with each exercise's weights for today, e.g. `Incline 15kg × 10, 12.5kg × 15`.
+- Normal, lighter (comeback after a break, ~15% off) or deload (~40% off; doesn't move your weights).
 - Last session at a glance and a couple of specific tips.
 
 **During a session**
-- Each exercise shows last time's sets and the note you left yourself.
-- A note that stays with the exercise (seat position, "keep elbows down") sits on top of the card every session, even when it's collapsed. Edit it right there.
+- Done exercises stack on top in the order you actually did them ("2nd, planned 5th"); the rest wait below in program order. Machine taken? Just open the next one.
+- Each set has a rep goal (10, 12, 15…). Hit it or beat it = green; one or two short is fine; further short is flagged.
 - Weight is prefilled; tap the number of reps you did and the set is logged. Rest timer starts on its own.
-- Weight steppers fit the equipment: machines move a plate at a time, free weights by 0.5 kg with ±2.5/±5 jumps, or tap the number and type it.
-- Change a set's rep aim mid-session if the program needs correcting.
-- "Next time" starts as the same. One tap for "Up on set 2" (bump the back-off set first) or "All up", or change a set's weight and aim. A note for next time is there from the first set.
-- Reorder, skip or add exercises on the fly: from the list (machines and free weights apart), as a new exercise, or as a one-off you just type in. Unlogged ones carry over to next time.
+- Steppers fit the equipment: pin stacks move a plate at a time, plate-loaded machines and free weights by 0.5 kg with ±2.5/±5 jumps, or tap the number and type it.
+- Two kinds of note: the note that stays with the exercise (seat position, form cue), and a note for next time only, shown once next session.
+- "Next time" starts as the same. One tap for the usual next step: set 1 heavier, more reps on set 2, set 2 heavier (never past set 1). Anything else per set.
+- Not done? "Skip today" or "Machine not available", so a broken machine isn't your fault in the log.
+- Add exercises on the fly: from the list, as a new exercise, or as a one-off you just type in.
 - Finish with how your body and head felt (1–5) and when you actually finished, if you forgot to tap Finish.
 - Works through a flaky tunnel: every tap is saved on the phone first and synced when the server is reachable.
 
-**History**: every session in note shorthand (`48×10×2`), editable after the fact.
+**History**: every session, editable after the fact, including the order things were done in.
 
 **Progress**
 - Training calendar for the last six months.
 - Sets per muscle over 4 weeks (gaps stand out).
-- Per-exercise trend (climbing / steady / slipping) with a chart, full history and setup (weight step, usual reps, seat-position note).
-- Tips: stalled lifts, gains, push/pull balance, missing legs, deload timing.
+- Per-exercise trend (climbing / steady / slipping) with a chart and full history.
+- Tips: stalled lifts, gains, push/pull balance, deload timing.
 
 Phone first (add it to the home screen), responsive up to desktop.
 

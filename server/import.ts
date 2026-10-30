@@ -3,8 +3,8 @@
 // The note is newest-first, sessions separated by blank lines, lines like "Incline 15x10, 12.5x13 (stay)".
 // The notes have no dates, so they're spread back from --last every --every days and flagged approx.
 import fs from "node:fs";
-import { emptyDB, exMap, newId, rangeFor } from "../shared/logic.ts";
-import type { DayId, Entry, Exercise, Session, SetLog, Target } from "../shared/types.ts";
+import { emptyDB, exMap, newId } from "../shared/logic.ts";
+import type { Entry, Exercise, Session, SetLog, Target } from "../shared/types.ts";
 import { load, save } from "./store.ts";
 
 const args = process.argv.slice(2);
@@ -59,8 +59,8 @@ const sessions: Session[] = blocks.map((lines, i) => {
     if (sets.length) entry.next = readNote(note, sets, ex);
     entries.push(entry);
   }
-  const count = (d: DayId) => entries.filter((e) => m.get(e.ex)?.day === d).length;
-  const day: DayId = count("chest") > count("back") ? "chest" : "back";
+  // Whichever program has more of these exercises.
+  const day = [...fresh.programs].sort((a, b) => entries.filter((e) => b.items.includes(e.ex)).length - entries.filter((e) => a.items.includes(e.ex)).length)[0]?.id ?? null;
   const date = new Date(last.getTime() - i * every * 86_400_000);
   return { id: newId() + i, day, date: date.toISOString(), end: new Date(date.getTime() + 3_600_000).toISOString(), mode: "normal", entries, approx: true };
 });
@@ -70,12 +70,10 @@ save(fresh);
 console.log(`Imported ${sessions.length} sessions (newest ${sessions[0]?.date.slice(0, 10)}, every ${every} days).`);
 if (unknown.size) console.log("Skipped unknown exercise names:", [...unknown].join(", "));
 
-/** Turns the owner's shorthand ("12 on the second, 12-15", "go up", "drop to 18 on second") into targets. Default: stay. */
+/** Turns the owner's shorthand ("12 on the second", "go up", "drop to 18 on second", "try 15 again") into targets. Default: stay. */
 function readNote(note: string, sets: SetLog[], ex: Exercise): Target[] {
-  const t: Target[] = sets.map((s, i) => {
-    const [lo, hi] = rangeFor(ex, sets.map((x) => x.w), i);
-    return { w: s.w, lo, hi };
-  });
+  // A lighter set after the first is a back-off set: higher rep goal.
+  const t: Target[] = sets.map((s, i) => ({ w: s.w, r: i > 0 && s.w < sets[0].w ? Math.max(15, ex.aim) : ex.aim }));
   const n = note.toLowerCase();
   const isWeight = (v: number, i: number) => ex.inc > 0 && v !== sets[i].r && Math.abs(v - sets[i].w) % ex.inc < 0.01 && v > 4;
   const second = Math.min(1, t.length - 1);
@@ -83,17 +81,11 @@ function readNote(note: string, sets: SetLog[], ex: Exercise): Target[] {
   for (const [, v, which] of n.matchAll(/(?<![\d.-])(\d+(?:\.\d+)?)\s+(?:ok\s+)?(?:on\s+)?(?:the\s+)?(first|second)/g)) {
     const i = which === "first" ? 0 : second;
     if (isWeight(Number(v), i) || which === "first") t[i].w = Number(v);
-    else t[i].hi = Math.max(t[i].lo, Number(v));
+    else t[i].r = Number(v);
   }
-  for (const [, lo, hi, on] of n.matchAll(/(\d+)-(\d+)(\s+on\s+(?:the\s+)?second)?/g)) {
-    const targets = on || /second/.test(n) ? [t[second]] : t;
-    targets.forEach((x) => ((x.lo = Number(lo)), (x.hi = Number(hi))));
-  }
+  // "12-15" ranges: the goal is the top.
+  for (const [, , hi, on] of n.matchAll(/(\d+)-(\d+)(\s+on\s+(?:the\s+)?second)?/g)) (on || /second/.test(n) ? [t[second]] : t).forEach((x) => (x.r = Number(hi)));
   const goTo = n.match(/(?:go to|try)\s+(\d+)/);
-  if (goTo && !isWeight(Number(goTo[1]), 0)) {
-    const r = Number(goTo[1]);
-    const i = /second/.test(n) || /again/.test(n) ? [t[second]] : t;
-    i.forEach((x) => ((x.hi = r), (x.lo = Math.min(x.lo, r))));
-  }
+  if (goTo && !isWeight(Number(goTo[1]), 0)) (/second|again/.test(n) ? [t[second]] : t).forEach((x) => (x.r = Number(goTo[1])));
   return t;
 }

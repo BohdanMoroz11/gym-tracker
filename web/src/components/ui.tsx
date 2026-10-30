@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Exercise } from "../../../shared/types.ts";
-import { fmtW, isFree, stepOf } from "../../../shared/logic.ts";
+import { AIMS, fmtW, isStack, stepOf, weightMeaning } from "../../../shared/logic.ts";
 import { cx } from "../lib.ts";
 
 /** Bottom sheet on phones, centered dialog on wider screens. */
@@ -47,7 +47,7 @@ export const Kg = ({ w, className }: { w: number; className?: string }) => (
 
 /**
  * − weight + with the number itself tappable to type any value.
- * Free weights step by 0.5 and get jump buttons for a new pair of dumbbells or a plate.
+ * Plates and free weights step by 0.5 and get jump buttons for a new pair of dumbbells or a plate.
  */
 export function WeightStepper({ value, ex, onChange }: { value: number; ex: Exercise; onChange: (w: number) => void }) {
   const step = stepOf(ex);
@@ -84,7 +84,7 @@ export function WeightStepper({ value, ex, onChange }: { value: number; ex: Exer
           +
         </button>
       </div>
-      {isFree(ex) && (
+      {!isStack(ex) && (
         <div className="flex justify-center gap-2">
           {[-5, -2.5, 2.5, 5].map((d) => (
             <button key={d} onClick={() => set(value + d)} className="num h-10 min-w-14 rounded-lg bg-floor/70 px-2 text-lg text-mute active:bg-rule" aria-label={`${d > 0 ? "Plus" : "Minus"} ${Math.abs(d)} kg`}>
@@ -94,6 +94,7 @@ export function WeightStepper({ value, ex, onChange }: { value: number; ex: Exer
           ))}
         </div>
       )}
+      {weightMeaning(ex) && <p className="text-center text-sm text-mute">{weightMeaning(ex)}</p>}
     </div>
   );
 }
@@ -137,24 +138,43 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-/** Rep-range chips, wrap instead of scroll so nothing gets cut. */
-export const RANGES: [number, number][] = [
-  [5, 8],
-  [8, 10],
-  [10, 12],
-  [12, 15],
-  [15, 20],
-];
-export function RangePicker({ lo, hi, onChange }: { lo: number; hi: number; onChange: (lo: number, hi: number) => void }) {
-  const known = RANGES.some(([a, b]) => a === lo && b === hi);
-  const opts = known ? RANGES : [...RANGES, [lo, hi] as [number, number]].sort((a, b) => a[0] - b[0]);
+/** Rep goal: the usual numbers as chips, − + for anything else. */
+export function AimPicker({ value, onChange }: { value: number; onChange: (r: number) => void }) {
   return (
-    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-      {opts.map(([a, b]) => (
-        <button key={`${a}-${b}`} onClick={() => onChange(a, b)} className={cx("num h-12 rounded-xl text-xl", a === lo && b === hi ? "bg-chalk text-floor" : "bg-floor text-chalk active:bg-rule")}>
-          {a}–{b}
+    <div className="space-y-1.5">
+      <div className="grid grid-cols-7 gap-1">
+        {AIMS.map((a) => (
+          <button key={a} onClick={() => onChange(a)} aria-pressed={a === value} className={cx("num h-12 min-w-0 rounded-xl text-xl", a === value ? "bg-chalk text-floor" : "bg-floor text-chalk active:bg-rule")}>
+            {a}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={() => onChange(Math.max(1, value - 1))} className={cx(pill, "h-11 w-14 shrink-0 bg-floor px-0 text-xl")} aria-label="One rep less">
+          −
         </button>
-      ))}
+        <div className="num flex h-11 flex-1 items-center justify-center rounded-xl bg-floor/50 text-xl">
+          {value} <span className="ml-1.5 font-sans text-sm font-normal text-mute">reps</span>
+        </div>
+        <button onClick={() => onChange(value + 1)} className={cx(pill, "h-11 w-14 shrink-0 bg-floor px-0 text-xl")} aria-label="One rep more">
+          +
+        </button>
+      </div>
     </div>
+  );
+}
+
+/** On/off row, a big tappable switch. */
+export function Toggle({ label, sub, value, onChange }: { label: string; sub?: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button onClick={() => onChange(!value)} aria-pressed={value} className="flex min-h-14 w-full items-center gap-3 rounded-xl bg-floor px-3.5 py-2 text-left active:bg-rule">
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{label}</span>
+        {sub && <span className="block text-sm text-mute">{sub}</span>}
+      </span>
+      <span className={cx("relative h-7 w-12 shrink-0 rounded-full transition-colors", value ? "bg-green" : "bg-rule")}>
+        <span className={cx("absolute top-1 h-5 w-5 rounded-full bg-chalk transition-all", value ? "left-6" : "left-1")} />
+      </span>
+    </button>
   );
 }

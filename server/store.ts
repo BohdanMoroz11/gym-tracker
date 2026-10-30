@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DB } from "../shared/types.ts";
-import { emptyDB } from "../shared/logic.ts";
+import { emptyDB, migrate } from "../shared/logic.ts";
 
 // The whole database is one JSON file. Small (a few hundred sessions), human-readable, easy to back up.
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -15,7 +15,7 @@ let db: DB | undefined;
 export function load(): DB {
   if (db) return db;
   fs.mkdirSync(BACKUPS, { recursive: true });
-  db = fs.existsSync(FILE) ? (JSON.parse(fs.readFileSync(FILE, "utf8")) as DB) : emptyDB();
+  db = fs.existsSync(FILE) ? migrate(JSON.parse(fs.readFileSync(FILE, "utf8"))) : emptyDB();
   return db;
 }
 

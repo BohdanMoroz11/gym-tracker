@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DB, Mode, Session } from "../../../shared/types.ts";
-import { DAYS, done, exMap, fmtDate, fmtSets } from "../../../shared/logic.ts";
+import { done, exMap, fmtDate, fmtSets, sessionLabel } from "../../../shared/logic.ts";
 import { cx, dayColor, go, useDeleteSession, useSaveSession } from "../lib.ts";
 import { FEEL, Rating, SessionEditor } from "./Session.tsx";
 import { Field, input, pill, Segmented } from "./ui.tsx";
@@ -31,8 +31,8 @@ export function HistoryPage({ db }: { db: DB }) {
               return (
                 <button key={s.id} onClick={() => go(`/s/${s.id}`)} className="rounded-2xl bg-mat p-4 text-left hover:bg-bench">
                   <div className="flex items-center gap-2">
-                    <span className="h-4 w-1.5 rounded-full" style={{ background: dayColor(s.day) }} />
-                    <span className="font-semibold">{s.day ? DAYS[s.day].label : "Session"}</span>
+                    <span className="h-4 w-1.5 rounded-full" style={{ background: dayColor(db, s.day) }} />
+                    <span className="font-semibold">{sessionLabel(db, s)}</span>
                     <span className="text-sm text-mute">{s.approx ? "date unknown" : fmtDate(s.date)}</span>
                     {s.mode !== "normal" && <span className="text-sm text-mute">{s.mode === "deload" ? "deload" : "lighter"}</span>}
                     <span className="flex-1" />
@@ -41,7 +41,7 @@ export function HistoryPage({ db }: { db: DB }) {
                   <div className="mt-2 space-y-0.5 text-sm">
                     {s.entries.map((e, i) => (
                       <p key={i} className={cx("truncate", !e.sets.length && "text-faint")}>
-                        <span className={e.sets.length ? "text-mute" : ""}>{m.get(e.ex)?.name ?? e.ex}</span> {e.sets.length ? fmtSets(e.sets) : "skipped"}
+                        <span className={e.sets.length ? "text-mute" : ""}>{m.get(e.ex)?.name ?? e.ex}</span> {e.sets.length ? fmtSets(e.sets) : e.skip === "unavailable" ? "not available" : "skipped"}
                         {e.note && <span className="text-faint"> ({e.note})</span>}
                       </p>
                     ))}
@@ -71,6 +71,7 @@ export function SessionPage({ db, id }: { db: DB; id: string }) {
   const save = useSaveSession();
   const del = useDeleteSession();
   const [sure, setSure] = useState(false);
+  const [editing, setEditing] = useState(false);
   const s = db.sessions.find((x) => x.id === id);
   if (!s) return <p className="py-16 text-center text-mute">This session was deleted.</p>;
   if (!s.end) {
@@ -94,8 +95,8 @@ export function SessionPage({ db, id }: { db: DB; id: string }) {
         ‹ Back
       </button>
       <div className="mt-4 flex items-center gap-3">
-        <span className="h-10 w-2 shrink-0 rounded-full" style={{ background: dayColor(s.day) }} />
-        <h1 className="num text-4xl uppercase">{s.day ? DAYS[s.day].label : "Session"}</h1>
+        <span className="h-10 w-2 shrink-0 rounded-full" style={{ background: dayColor(db, s.day) }} />
+        <h1 className="num text-4xl uppercase">{sessionLabel(db, s)}</h1>
       </div>
 
       <div className="mt-4 space-y-5 rounded-2xl bg-mat p-4">
@@ -146,8 +147,13 @@ export function SessionPage({ db, id }: { db: DB; id: string }) {
         )}
       </div>
 
-      <h2 className="mt-6 mb-2 text-sm text-mute">Tap an exercise to fix sets or next time's plan</h2>
-      <SessionEditor db={db} session={s} onChange={save} live={false} />
+      <div className="mt-6 mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+        <p className="text-sm text-mute">{editing ? "Open an exercise to move it up or down, or remove it." : "Tap an exercise to fix its sets or next time."}</p>
+        <button onClick={() => setEditing(!editing)} aria-pressed={editing} className={cx(pill, editing && "bg-chalk text-floor active:bg-chalk hover:bg-chalk")}>
+          {editing ? "Done" : "Fix order"}
+        </button>
+      </div>
+      <SessionEditor db={db} session={s} onChange={save} live={false} editing={editing} />
 
       <button
         onClick={() => {

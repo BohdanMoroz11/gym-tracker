@@ -1,11 +1,5 @@
-import type { DayId, DB, Entry, Exercise, Group, Mode, Session, SetLog, Target } from "./types.ts";
-import { LIBRARY } from "./library.ts";
-
-export const DAYS: Record<DayId, { label: string; groups: string }> = {
-  back: { label: "Back day", groups: "Back and biceps" },
-  chest: { label: "Chest day", groups: "Chest, shoulders and triceps" },
-  legs: { label: "Legs day", groups: "Legs" },
-};
+import type { Color, DB, Entry, Exercise, Group, Kind, Mode, Program, Session, SetLog, Target } from "./types.ts";
+import { LIBRARY, STARTER_PROGRAMS } from "./library.ts";
 
 export const GROUP_LABEL: Record<Group, string> = {
   back: "Back",
@@ -28,10 +22,9 @@ const DAY_MS = 86_400_000;
 // ---------- formatting ----------
 
 export const fmtW = (w: number) => (Number.isInteger(w) ? String(w) : w.toFixed(2).replace(/0+$/, ""));
-const fmtRange = (lo: number, hi: number) => (lo === hi ? String(hi) : `${lo}–${hi}`);
 
-/** "15kg × 10, 12.5kg × 13"; identical sets collapse to "48kg × 10 (2 sets)". */
-export function fmtSets(sets: SetLog[]): string {
+/** "15kg × 10, 12.5kg × 13"; identical sets collapse to "48kg × 10 (2 sets)". Works for sets and targets alike. */
+export function fmtSets(sets: { w: number; r: number }[]): string {
   const out: string[] = [];
   for (let i = 0; i < sets.length; ) {
     let n = 1;
@@ -41,25 +34,49 @@ export function fmtSets(sets: SetLog[]): string {
   }
   return out.join(", ");
 }
+export const fmtTargets = (ts: Target[]) => fmtSets(ts);
 
-export function fmtTargets(ts: Target[]): string {
-  const out: string[] = [];
-  for (let i = 0; i < ts.length; ) {
-    let n = 1;
-    const a = ts[i];
-    while (i + n < ts.length && ts[i + n].w === a.w && ts[i + n].lo === a.lo && ts[i + n].hi === a.hi) n++;
-    out.push(`${fmtW(a.w)}kg × ${fmtRange(a.lo, a.hi)}${n > 1 ? ` (${n} sets)` : ""}`);
-    i += n;
-  }
-  return out.join(", ");
-}
+export const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th"}`;
+
+// ---------- equipment ----------
+
+export const KINDS: { value: Kind; label: string; hint: string }[] = [
+  { value: "stack", label: "Machine, pin stack", hint: "Moves by its stack step" },
+  { value: "plates", label: "Machine, plates", hint: "0.5 kg steps, ±2.5 and ±5 jumps" },
+  { value: "cable", label: "Cable", hint: "Moves by its stack step" },
+  { value: "dumbbell", label: "Dumbbells", hint: "Weight per dumbbell" },
+  { value: "barbell", label: "Barbell", hint: "Total weight on the bar" },
+  { value: "bodyweight", label: "Bodyweight", hint: "Added weight, 0 for none" },
+];
+export const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.value, k.label])) as Record<Kind, string>;
 
 export const isFree = (ex: Exercise) => ex.kind === "dumbbell" || ex.kind === "barbell" || ex.kind === "bodyweight";
-/** Stepper granularity: machines move by their stack step, free weights by 0.5 (big jumps are typed or use the jump buttons). */
-export const stepOf = (ex: Exercise) => (isFree(ex) ? 0.5 : ex.inc || 1);
-export const KIND_LABEL: Record<Exercise["kind"], string> = { machine: "Machine", cable: "Cable", dumbbell: "Dumbbells", barbell: "Barbell", bodyweight: "Bodyweight" };
+/** Pin stacks and cables move by the stack step; plates and free weights by 0.5, with jump buttons for big changes. */
+export const isStack = (ex: Exercise) => ex.kind === "stack" || ex.kind === "cable";
+export const stepOf = (ex: Exercise) => (isStack(ex) ? ex.inc || 1 : 0.5);
 
-export const fmtRangeT = (t: Target) => fmtRange(t.lo, t.hi);
+/** "Dumbbells, both arms together", "Machine, pin stack · one side at a time". */
+export function equipLabel(ex: Exercise): string {
+  if (ex.kind === "dumbbell") return ex.side === "each" ? "Dumbbell, one arm at a time" : "Dumbbells, both arms together";
+  return KIND_LABEL[ex.kind] + (ex.side === "each" ? ", one side at a time" : "");
+}
+/** What the weight number means, shown under the stepper. */
+export function weightMeaning(ex: Exercise): string | undefined {
+  if (ex.kind === "dumbbell") return "kg per dumbbell";
+  if (ex.side === "each") return "kg per side, reps per side";
+  if (ex.kind === "bodyweight") return "added kg";
+  return undefined;
+}
+
+// ---------- programs ----------
+
+export const COLORS: Color[] = ["blue", "red", "yellow", "chalk"];
+export const programOf = (db: DB, id: string | null | undefined) => (id ? db.programs.find((p) => p.id === id) : undefined);
+export const sessionLabel = (db: DB, s: Session) => programOf(db, s.day)?.name ?? "Session";
+/** Programs an exercise is in, by name. */
+export const programsWith = (db: DB, exId: string) => db.programs.filter((p) => p.items.includes(exId));
+
+// ---------- dates ----------
 
 export function daysBetween(a: string | Date, b: string | Date = new Date()): number {
   const d = (x: string | Date) => {
@@ -111,96 +128,152 @@ export function history(db: DB, exId: string, skipSession?: string): HistoryItem
   return out;
 }
 
-// ---------- progression ----------
+// ---------- reps and progression ----------
 
-/** Default rep range for set i. A lighter set after the first is a back-off set: higher reps. */
-export function rangeFor(ex: Exercise, ws: number[], i: number): [number, number] {
-  if (i > 0 && ws[i] < ws[0] && ex.range[1] < 15) return [12, 15];
-  return ex.range;
+/** Rep goals people actually pick. "+reps" moves to the next one. */
+export const AIMS = [5, 6, 8, 10, 12, 15, 20];
+export const nextAim = (r: number) => AIMS.find((a) => a > r) ?? r + 5;
+
+/** At or over the goal = hit. One or two short = close (fine). Further short = a miss. */
+export type Verdict = "hit" | "close" | "short";
+export const verdict = (r: number, aim: number): Verdict => (r >= aim ? "hit" : r >= aim - 2 ? "close" : "short");
+
+/** Today's target for set i, extending the plan with its last set when more sets are done than planned. */
+export function targetAt(entry: Entry, ex: Exercise, i: number): Target {
+  const plan = entry.plan ?? [];
+  const t = plan[i] ?? plan[plan.length - 1];
+  return { w: plan[i]?.w ?? entry.sets[i - 1]?.w ?? t?.w ?? ex.inc * 2, r: t?.r ?? ex.aim };
 }
 
-/** Double progression, per set: top of the range → one step up; way short → one step down; else stay. */
-export function suggestNext(entry: Entry, ex: Exercise): Target[] {
-  return entry.sets.map((s, i) => {
-    const p = entry.plan?.[i];
-    const [dlo, dhi] = rangeFor(ex, entry.sets.map((x) => x.w), i);
-    const lo = p?.lo ?? dlo;
-    const hi = p?.hi ?? dhi;
-    let w = s.w;
-    if (s.r >= hi) w = s.w + ex.inc;
-    else if (s.r < lo - 2 && ex.inc && s.w > ex.inc) w = s.w - ex.inc;
-    return { w, lo, hi };
-  });
-}
-
-/** Default for next time: the same weights, same aims. The owner bumps it when they want to. */
+/** Next time, unchanged: the weights done today (or planned, for sets not done) with today's goals. */
 export function sameNext(entry: Entry, ex: Exercise): Target[] {
-  return entry.sets.map((s, i) => {
-    const p = entry.plan?.[i];
-    const [lo, hi] = p ? [p.lo, p.hi] : rangeFor(ex, entry.sets.map((x) => x.w), i);
-    return { w: s.w, lo, hi };
-  });
-}
-
-/** One-tap choices for next time. "Up on the last set" first: the owner bumps the back-off set before the top set. */
-export function nextPresets(entry: Entry, ex: Exercise) {
-  const same = sameNext(entry, ex);
-  const bump = (t: Target) => ({ ...t, w: +(t.w + ex.inc).toFixed(2) });
-  const out: { key: string; label: string; ts: Target[] }[] = [{ key: "same", label: "Same", ts: same }];
-  if (same.length >= 2) out.push({ key: "last", label: `Up on set ${same.length}`, ts: same.map((t, i) => (i === same.length - 1 ? bump(t) : t)) });
-  out.push({ key: "all", label: "All up", ts: same.map(bump) });
-  return out;
+  const n = Math.max(entry.plan?.length ?? 0, entry.sets.length);
+  return Array.from({ length: n }, (_, i) => ({ w: entry.sets[i]?.w ?? targetAt(entry, ex, i).w, r: targetAt(entry, ex, i).r }));
 }
 
 export const nextOf = (entry: Entry, ex: Exercise) => entry.next ?? sameNext(entry, ex);
 
-/** What the last real (non-deload) time told us to do now. */
+export interface NextOption {
+  key: string;
+  label: string;
+  ts: Target[];
+}
+
+/**
+ * The owner's progression, as one-tap choices. Usual path for 10kg × 10 (2 sets):
+ * weight up on set 1 → reps up on set 2 (12, 15) → weight up on set 2 → repeat. Set 2 is never heavier than set 1.
+ * Anything else (both up, lower the goal) goes through the per-set editor.
+ */
+export function nextOptions(entry: Entry, ex: Exercise): NextOption[] {
+  const base = sameNext(entry, ex);
+  const out: NextOption[] = [{ key: "same", label: "Same", ts: base }];
+  if (!base.length) return out;
+  const up = (w: number) => +(w + ex.inc).toFixed(2);
+  const first = base[0];
+  const rest = base.slice(1);
+  const restName = rest.length > 1 ? `Sets 2–${base.length}` : "Set 2";
+  if (ex.inc > 0) out.push({ key: "w1", label: rest.length ? `Set 1 → ${fmtW(up(first.w))}kg` : `→ ${fmtW(up(first.w))}kg`, ts: [{ ...first, w: up(first.w) }, ...rest] });
+  if (!rest.length) {
+    out.push({ key: "r1", label: `→ ${nextAim(first.r)} reps`, ts: [{ ...first, r: nextAim(first.r) }] });
+    return out;
+  }
+  const sameAim = rest.every((t) => t.r === rest[0].r);
+  out.push({ key: "r2", label: `${restName} → ${sameAim ? `${nextAim(rest[0].r)} reps` : "more reps"}`, ts: [first, ...rest.map((t) => ({ ...t, r: nextAim(t.r) }))] });
+  const heavier = rest.map((t) => ({ ...t, w: Math.min(first.w, up(t.w)) }));
+  if (ex.inc > 0 && heavier.some((t, i) => t.w !== rest[i].w)) {
+    const sameW = heavier.every((t) => t.w === heavier[0].w);
+    out.push({ key: "w2", label: `${restName} → ${sameW ? `${fmtW(heavier[0].w)}kg` : "heavier"}`, ts: [first, ...heavier] });
+  }
+  return out;
+}
+
+/** What the last real (non-deload) time said to do now. */
 export function targetsFor(db: DB, ex: Exercise, skipSession?: string): Target[] {
   const h = history(db, ex.id, skipSession).find((x) => x.session.mode !== "deload");
   if (!h) return [];
   return nextOf(h.entry, ex);
 }
 
+/** The note left last time for this exercise, if the last time had one. It's for one session only. */
+export function noteFromLast(db: DB, exId: string, session: Session): HistoryItem | undefined {
+  const h = history(db, exId, session.id).find((x) => x.session.date < session.date);
+  return h?.entry.note ? h : undefined;
+}
+
 export function applyMode(ts: Target[], mode: Mode, ex: Exercise): Target[] {
   if (mode === "normal") return ts;
   const f = MODE_FACTOR[mode];
-  return ts.map((t) => ({ ...t, w: roundTo(t.w * f, ex.inc) }));
+  return ts.map((t) => ({ ...t, w: roundTo(t.w * f, stepOf(ex)) }));
 }
 
-/** Exercise order for a day: the last session of that day (including the ones planned but skipped). */
-export function dayPlan(db: DB, day: DayId): string[] {
-  const last = done(db).find((s) => s.day === day);
-  if (last?.entries.length) return last.entries.map((e) => e.ex);
-  return db.exercises.filter((e) => e.day === day && !e.archived).map((e) => e.id);
-}
-
-export function suggestDay(db: DB): DayId {
-  const last = done(db).find((s) => s.day === "back" || s.day === "chest");
-  return last?.day === "back" ? "chest" : "back";
+/** The program least recently trained (never trained first). */
+export function suggestDay(db: DB): string | null {
+  if (!db.programs.length) return null;
+  const last = (p: Program) => done(db).find((s) => s.day === p.id)?.date ?? "";
+  return [...db.programs].sort((a, b) => last(a).localeCompare(last(b)))[0].id;
 }
 
 export const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+export const slug = (name: string) => name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36).slice(-4);
 
-export function startSession(db: DB, day: DayId | null, mode: Mode): Session {
-  const ids = day ? dayPlan(db, day) : [];
+export function startSession(db: DB, day: string | null, mode: Mode): Session {
   const m = exMap(db);
-  return {
-    id: newId(),
-    day,
-    date: new Date().toISOString(),
-    mode,
-    entries: ids.filter((id) => m.has(id)).map((id) => newEntry(db, m.get(id)!, mode)),
-  };
+  const ids = (programOf(db, day)?.items ?? []).filter((id) => m.has(id));
+  return { id: newId(), day, date: new Date().toISOString(), mode, planned: ids, entries: ids.map((id) => newEntry(db, m.get(id)!, mode)) };
 }
 
 export function newEntry(db: DB, ex: Exercise, mode: Mode): Entry {
   let plan = targetsFor(db, ex);
-  if (!plan.length) plan = [0, 1].map(() => ({ w: ex.inc * 2, lo: ex.range[0], hi: ex.range[1] }));
+  if (!plan.length) plan = [0, 1].map(() => ({ w: isStack(ex) ? ex.inc * 2 : 10, r: ex.aim }));
   return { ex: ex.id, sets: [], plan: applyMode(plan, mode, ex) };
 }
 
+export const started = (e: Entry) => e.sets.length > 0;
+
+/** The first set on an exercise puts it right after the ones already done, so entries keep the real order. */
+export function markStarted(entries: Entry[], i: number): Entry[] {
+  const out = [...entries];
+  const [e] = out.splice(i, 1);
+  const at = out.findIndex((x) => !started(x));
+  out.splice(at < 0 ? out.length : at, 0, e);
+  return out;
+}
+
+/** After the program changed mid-session: what's not started yet follows the new program. Done exercises stay put. */
+export function followProgram(db: DB, s: Session, program: Program): Session {
+  const m = exMap(db);
+  const begun = s.entries.filter((e) => started(e) || e.skip);
+  const waiting = new Map(s.entries.filter((e) => !begun.includes(e)).map((e) => [e.ex, e]));
+  const fromProgram = program.items.filter((id) => m.has(id) && !begun.some((e) => e.ex === id)).map((id) => waiting.get(id) ?? newEntry(db, m.get(id)!, s.mode));
+  // Exercises added by hand today (never in the plan) stay too.
+  const added = [...waiting.values()].filter((e) => !program.items.includes(e.ex) && !s.planned?.includes(e.ex));
+  return { ...s, planned: program.items.filter((id) => m.has(id)), entries: [...begun, ...fromProgram, ...added] };
+}
+
 /** Defaults for a fresh database. */
-export const emptyDB = (): DB => ({ version: 1, exercises: structuredClone(LIBRARY), sessions: [] });
+export const emptyDB = (): DB => ({ version: 2, exercises: structuredClone(LIBRARY), programs: structuredClone(STARTER_PROGRAMS), sessions: [] });
+
+// ---------- migration ----------
+
+/** v1 had rep ranges, a fixed back/chest/legs day list and "machine" for every machine. */
+export function migrate(raw: any): DB {
+  if (raw.version === 2) return raw as DB;
+  const toT = (ts?: any[]) => ts?.map((t) => ("r" in t ? t : { w: t.w, r: t.hi }));
+  const exercises: Exercise[] = raw.exercises
+    .filter((e: { day?: string; group: string }) => e.day !== "legs")
+    .map(({ day: _d, range, kind, ...e }: Exercise & { day?: string; range: [number, number] }) => ({ ...e, kind: (kind as string) === "machine" ? "stack" : kind, aim: e.aim ?? range?.[1] ?? 10 }));
+  const sessions: Session[] = raw.sessions.map((s: Session) => ({
+    ...s,
+    day: s.day === "legs" ? null : s.day,
+    entries: s.entries.map((e) => ({ ...e, plan: toT(e.plan), next: toT(e.next) })),
+  }));
+  const programs: Program[] = (["back", "chest"] as const).map((d, i) => {
+    const last = sessions.filter((s) => s.end && s.day === d).sort((a, b) => b.date.localeCompare(a.date))[0];
+    const items = last?.entries.length ? last.entries.map((e) => e.ex) : STARTER_PROGRAMS[i].items;
+    return { ...STARTER_PROGRAMS[i], items: items.filter((id) => exercises.some((e) => e.id === id)) };
+  });
+  return { version: 2, exercises, programs, sessions };
+}
 
 // ---------- records & stats ----------
 
@@ -317,7 +390,7 @@ export function tips(db: DB): Tip[] {
     if (!p.length || daysBetween(p[p.length - 1].date) > 45) continue;
     const stuck = stalledFor(p);
     if (stuck >= 4) {
-      out.push({ id: `stall-${ex.id}`, tone: "nudge", ex: ex.id, text: `${ex.name} hasn't beaten its best in ${stuck} sessions. Drop one step (${fmtW(ex.inc)} kg) and build back up to the top of the range.` });
+      out.push({ id: `stall-${ex.id}`, tone: "nudge", ex: ex.id, text: `${ex.name} hasn't beaten its best in ${stuck} sessions. Drop one step (${fmtW(ex.inc)} kg) and build the reps back up.` });
       continue;
     }
     const month = p.filter((x) => daysBetween(x.date) <= 30 && x.mode === "normal");
@@ -328,16 +401,12 @@ export function tips(db: DB): Tip[] {
     }
   }
 
-  const legSets = setsByGroup(db, 60).legs;
-  if (done(db).length >= 3 && legSets === 0)
-    out.push({ id: "legs", tone: "nudge", text: "No leg sets in the last two months. One leg machine at the end of a session is a 6-minute start." });
-
   const g = setsByGroup(db, 28);
   const pull = g.back + g.traps + g.biceps;
   const push = g.chest + g.shoulders + g.triceps;
   if (pull + push >= 20) {
-    if (push > pull * 1.6) out.push({ id: "bal", tone: "nudge", text: `${push} pushing sets vs ${pull} pulling in 4 weeks. A back day next evens it out.` });
-    else if (pull > push * 1.6) out.push({ id: "bal", tone: "nudge", text: `${pull} pulling sets vs ${push} pushing in 4 weeks. A chest day next evens it out.` });
+    if (push > pull * 1.6) out.push({ id: "bal", tone: "nudge", text: `${push} pushing sets vs ${pull} pulling in 4 weeks. More pulling evens it out.` });
+    else if (pull > push * 1.6) out.push({ id: "bal", tone: "nudge", text: `${pull} pulling sets vs ${push} pushing in 4 weeks. More pushing evens it out.` });
   }
 
   // Six straight weeks of 2+ sessions without a deload.
