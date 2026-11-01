@@ -3,8 +3,15 @@ import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Color, DB, Exercise, Program, Session } from "../../shared/types.ts";
 
 // ---------- data + offline-tolerant saving ----------
-// Gym wifi and SSH tunnels drop. Every session save goes to localStorage first ("pending"),
+// Gym wifi drops. Every session save goes to localStorage first ("pending"),
 // shows up in the UI immediately, and is pushed to the server until it sticks.
+
+// A 401 means the hub login expired. Reloading lets the hub show its login page; pending sets stay in localStorage.
+function checked(r: Response): Response {
+  if (r.status === 401) location.reload();
+  if (!r.ok) throw new Error(`Server said ${r.status}`);
+  return r;
+}
 
 const PENDING = "gym.pending";
 type Pending = Record<string, Session | { deleted: true; id: string }>;
@@ -34,8 +41,7 @@ function overlay(db: DB, p: Pending): DB {
 }
 
 async function fetchDB(): Promise<DB> {
-  const r = await fetch("/api/db");
-  if (!r.ok) throw new Error(`Server said ${r.status}`);
+  const r = checked(await fetch("/api/db"));
   return overlay(await r.json(), readPending());
 }
 
@@ -69,7 +75,7 @@ async function flush() {
         "deleted" in s
           ? await fetch(`/api/sessions/${id}`, { method: "DELETE" })
           : await fetch(`/api/sessions/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(s) });
-      if (!r.ok) throw new Error(String(r.status));
+      checked(r);
       const now = readPending();
       if (now[id] === undefined || JSON.stringify(now[id]) === JSON.stringify(s)) {
         delete now[id];
@@ -109,7 +115,7 @@ export function useSaveExercise() {
   const qc = useQueryClient();
   return async (e: Exercise) => {
     qc.setQueryData<DB>(["db"], (db) => db && { ...db, exercises: db.exercises.some((x) => x.id === e.id) ? db.exercises.map((x) => (x.id === e.id ? e : x)) : [...db.exercises, e] });
-    await fetch(`/api/exercises/${e.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(e) });
+    checked(await fetch(`/api/exercises/${e.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(e) }));
   };
 }
 
@@ -117,14 +123,14 @@ export function useSaveProgram() {
   const qc = useQueryClient();
   return async (p: Program) => {
     qc.setQueryData<DB>(["db"], (db) => db && { ...db, programs: db.programs.some((x) => x.id === p.id) ? db.programs.map((x) => (x.id === p.id ? p : x)) : [...db.programs, p] });
-    await fetch(`/api/programs/${p.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(p) });
+    checked(await fetch(`/api/programs/${p.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(p) }));
   };
 }
 export function useDeleteProgram() {
   const qc = useQueryClient();
   return async (id: string) => {
     qc.setQueryData<DB>(["db"], (db) => db && { ...db, programs: db.programs.filter((x) => x.id !== id) });
-    await fetch(`/api/programs/${id}`, { method: "DELETE" });
+    checked(await fetch(`/api/programs/${id}`, { method: "DELETE" }));
   };
 }
 

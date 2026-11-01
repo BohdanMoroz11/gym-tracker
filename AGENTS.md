@@ -18,7 +18,7 @@ The point: **as little logging overhead as possible.** The owner isn't disciplin
 
 ## Stack
 
-- **Server**: Node + Express, TypeScript via `tsx`. `server/`. Binds `127.0.0.1:5200` (Courtside 5180, Touchline 5190). Reached via SSH tunnel.
+- **Server**: Node + Express, TypeScript via `tsx`. `server/`. See Deployment below. Outside the container, the API defaults to `127.0.0.1:5200` (Courtside 5180, Touchline 5190).
 - **Frontend**: React 18 + Vite + Tailwind v4 + TanStack Query. `web/`. Dev server on 5203 proxies `/api`.
 - **Shared**: `shared/types.ts` (the contract), `shared/logic.ts` (progression, formatting, stats, tips; used by both sides), `shared/library.ts` (starter exercises).
 - **Storage**: one JSON file, `data/gym.json` (override the folder with `GYM_DATA`). Atomic writes (tmp + rename), first write each day copies to `data/backups/gym-YYYY-MM-DD.json`. Small data and one user, so no DB engine needed. If it ever outgrows this, `node:sqlite` is built in.
@@ -57,7 +57,7 @@ web/src/
 
 ## Design
 
-Direction: **"plates on rubber"**. Rubber-floor charcoal (`floor`, `mat`, `bench`, `rule`), chalk text, **competition plate colors as the only accents, each with a meaning**: program colors (blue, red, yellow or chalk; back = blue, chest = red), green = goal hit / done / changed for next time, amber = short of the goal. Yellow left bar = the note left last time. Numbers are the loud element: Big Shoulders Display (`.num`, tabular) for weights, reps and headings; Barlow for UI text. Fonts are self-hosted via @fontsource so they work through the tunnel.
+Direction: **"plates on rubber"**. Rubber-floor charcoal (`floor`, `mat`, `bench`, `rule`), chalk text, **competition plate colors as the only accents, each with a meaning**: program colors (blue, red, yellow or chalk; back = blue, chest = red), green = goal hit / done / changed for next time, amber = short of the goal. Yellow left bar = the note left last time. Numbers are the loud element: Big Shoulders Display (`.num`, tabular) for weights, reps and headings; Barlow for UI text. Fonts are self-hosted via @fontsource so they work on flaky connections.
 
 - **One tap per set.** The set input is a weight stepper (prefilled) plus a strip of rep numbers; the goal chip has a green ring. Tapping a number logs the set. Don't add confirm steps.
 - **Weights always carry the unit**: "15kg × 10" (`fmtSets`, `<Kg>`).
@@ -86,4 +86,20 @@ Direction: **"plates on rubber"**. Rubber-floor charcoal (`floor`, `mat`, `bench
 - Program blocks (time periods): tag sessions to a block ("hypertrophy, Oct–Nov"), compare blocks.
 - Rest timer goal per exercise with a gentle vibration (Android only; iOS web can't vibrate).
 - Body weight log, if the owner wants it.
-- Proper deploy with auth when it leaves the SSH tunnel.
+
+<!-- platform:start -->
+## Deployment
+
+Live at https://gym.bohdanmoroz.com, behind the shared hub login. Do not add auth to this app.
+
+- The `gym-tracker` container mounts this repo's primary checkout and runs `npm run live`. Caddy reaches it at `gym-tracker:3000`. No host port is published.
+- There is no build or deploy step. Files changed in the primary checkout go live automatically, so `main` there is production.
+- Worktree changes are not live until merged into the primary checkout's `main`. If merged on GitHub, run `git pull` in the primary checkout.
+- Preview in a worktree with `npm run dev`. Don't use the primary checkout for experiments.
+- If dependencies change, once they're on `main` run `npm install` in the primary checkout, on the host, then `docker restart gym-tracker`.
+- If `compose.yml` changes, run `docker compose up -d` in the primary checkout.
+- Logs: `docker logs -f gym-tracker`.
+- Never use root or an Alpine image: files and `node_modules` are shared with the host.
+- Routing, login and the app list belong to the `hub` repo. Don't change them from here.
+- `data/` is the only copy of real user data. Never delete or overwrite it.
+<!-- platform:end -->

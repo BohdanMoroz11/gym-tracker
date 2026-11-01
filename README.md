@@ -23,7 +23,7 @@ A personal gym log that replaces a messy phone note. It remembers what you did l
 - Not done? "Skip today" or "Machine not available", so a broken machine isn't your fault in the log.
 - Add exercises on the fly: from the list, as a new exercise, or as a one-off you just type in.
 - Finish with how your body and head felt (1–5) and when you actually finished, if you forgot to tap Finish.
-- Works through a flaky tunnel: every tap is saved on the phone first and synced when the server is reachable.
+- Works on flaky gym wifi: every tap is saved on the phone first and synced when the server is reachable.
 
 **History**: every session, editable after the fact, including the order things were done in.
 
@@ -44,12 +44,7 @@ npm install
 npm start          # builds the frontend, serves everything on http://127.0.0.1:5200
 ```
 
-The server binds to `127.0.0.1` only. From your own machine:
-
-```bash
-ssh -L 5200:127.0.0.1:5200 <server>
-# then open http://localhost:5200
-```
+The live version runs in a container at https://gym.bohdanmoroz.com, behind the shared login from the [hub](https://github.com/BohdanMoroz11/hub) repo. Files changed in the primary checkout go live automatically.
 
 Development: `npm run dev` (Vite on :5203 with hot reload, API on :5200). `PORT`/`HOST` override the API address, `GYM_DATA` the data folder.
 

@@ -1,0 +1,16 @@
+services:
+  app:
+    image: node:24-slim
+    container_name: gym-tracker
+    user: "1000:1000"
+    working_dir: /app
+    volumes: [".:/app"]
+    environment: { HOST: 0.0.0.0, PORT: 3000 }
+    command: npm run live
+    restart: unless-stopped
+    ports: ["127.0.0.1:5200:3000"] # temporary: keeps the old Tailscale route working until the phone has synced
+    networks: [web]
+
+networks:
+  web:
+    external: true
